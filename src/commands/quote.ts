@@ -20,16 +20,23 @@ export async function handle(client: discord.Client, interaction: discord.Comman
   const channelId = parsed[1];
   const messageId = parsed[2];
 
-  const channel = await client.channels.fetch(channelId) as discord.TextChannel;
-  const message = await channel.messages.fetch(messageId);
+  const channel = await client.channels.fetch(channelId) as discord.TextChannel | null;
+  if (!channel) {
+    interaction.editReply('메시지 url이 잘못됐습니다');
+    return;
+  }
+
+  const message = await (channel as discord.TextChannel).messages.fetch(messageId)
 
   const author = message.member?.displayName ?? message.member?.nickname ?? message.author.username;
   const content = message.content;
-  const avatarUrl = message.author.avatarURL({ format: 'png' })!;
+
+  const avatarUrl = message.member?.avatarURL({ format: 'png' }) ?? message.author.avatarURL({ format: 'png' })!;
+
   const savePath = `./imgs/quotes/${messageId}.png`;
 
   await createQuoteImage({
-    avatarUrl,
+    avatarUrl: avatarUrl!,
     author,
     content,
     savePath,

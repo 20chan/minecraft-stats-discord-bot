@@ -4,9 +4,7 @@
   "description": "",
   "main": "dist/src/index.js",
   "scripts": {
-    "build": "tsc",
-    "prestart": "npm run build",
-    "start": "node dist/src/index.js"
+    "start": "ts-node src/index.ts"
   },
   "author": "",
   "license": "ISC",
@@ -18,7 +16,7 @@
     "chart.js": "^3.9.1",
     "chartjs-node-canvas": "^4.1.6",
     "cuid": "^2.1.8",
-    "discord.js": "^13.1.0",
+    "discord.js": "^13.17.1",
     "dotenv": "^10.0.0",
     "node": "16.6.1",
     "node-cron": "^3.0.2",
