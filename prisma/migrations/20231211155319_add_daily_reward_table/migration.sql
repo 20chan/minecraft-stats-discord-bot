@@ -1,0 +1,6 @@
+-- CreateTable
+CREATE TABLE "DailyReward" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "amount" INTEGER NOT NULL,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

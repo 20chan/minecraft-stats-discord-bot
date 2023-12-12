@@ -1,0 +1,42 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Money {
+  id String @id
+  amount Int
+}
+
+model DailyReward {
+  id String @id
+  amount Int
+  updatedAt DateTime @default(now())
+}
+
+model Prediction {
+  id Int @id @default(autoincrement())
+  title String
+  ended Boolean @default(false)
+  completed Boolean @default(false)
+  createdAt DateTime @default(now())
+  userId String
+
+  valueSerialized String
+}
+
+model Bet {
+  id Int @id @default(autoincrement())
+  
+  predictionId Int
+  choiceIndex Int
+  userId String
+  amount Int
+}

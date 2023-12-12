@@ -47,7 +47,7 @@ export function diffSnapshots(a: UserResult[], b: UserResult[]) {
       },
       stats: {
         ores: {
-          ancientdebris: bUser.stats.ores.ancientdebris - (aUser.stats.ores.ancientdebris ?? 0),
+          ancientdebris: (bUser.stats.ores.ancientdebris ?? 0) - (aUser.stats.ores.ancientdebris ?? 0),
           netherite: bUser.stats.ores.netherite - aUser.stats.ores.netherite,
           diamond: bUser.stats.ores.diamond - aUser.stats.ores.diamond,
           emerald: bUser.stats.ores.emerald - aUser.stats.ores.emerald,

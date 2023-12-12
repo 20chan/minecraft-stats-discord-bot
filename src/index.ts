@@ -14,6 +14,9 @@ import {
 import {
   handle as handleQuote,
 } from './commands/quote';
+import {
+  handle as handleBet,
+} from './commands/bet';
 
 dotenv.config();
 
@@ -39,19 +42,50 @@ const commands = [
     .setName('명언')
     .setDescription('명언 제조기')
     .addStringOption(option => option.setName('url').setDescription('메시지 url')),
+  new SlashCommandBuilder()
+    .setName('베팅')
+    .setDescription('예측 베팅')
+    .addSubcommand(subcommand => subcommand
+      .setName('시작')
+      .setDescription('새로운 예측을 시작합니다')
+      .addStringOption(option => option.setName('주제').setDescription('예측 주제').setRequired(true))
+      .addStringOption(option => option.setName('선택지').setDescription('선택지를 쉼표로 구분해서 입력하세요').setRequired(true))
+    ),
+  new SlashCommandBuilder()
+    .setName('코인')
+    .setDescription('코인')
+    .addSubcommand(subcommand => subcommand
+      .setName('잔고')
+      .setDescription('내 잔고 확인')
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('랭킹')
+      .setDescription('전체 코인 랭킹 확인')
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('일일보상')
+      .setDescription('일일 출석 보상 (100~1000) 랜덤 획득')
+    ),
 ].map(x => x.toJSON());
 
 async function main() {
   console.log(commands.map(x => x.name));
+  const channel = await client.channels.fetch('1161658078266150973');
   client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) {
       return;
     }
-
-    if (interaction.commandName === 'mcstats') {
-      await handleMcstats(client, interaction);
-    } else if (interaction.commandName === '명언') {
-      await handleQuote(client, interaction)
+    try {
+      if (interaction.commandName === 'mcstats') {
+        await handleMcstats(client, interaction);
+      } else if (interaction.commandName === '명언') {
+        await handleQuote(client, interaction)
+      } else if (interaction.commandName.startsWith('베팅') || interaction.commandName.startsWith('코인')) {
+        await handleBet(client, interaction);
+      }
+    } catch (error) {
+      console.error(error);
+      await interaction.editReply({ content: '오류가 발생했습니다' });
     }
   });
 

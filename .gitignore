@@ -44,3 +44,5 @@ yarn.lock
 /imgs
 
 .env**
+
+prisma/dev.db

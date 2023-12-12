@@ -11,6 +11,7 @@
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.72.0",
     "@discordjs/rest": "^0.3.0",
+    "@prisma/client": "^5.7.0",
     "aws-sdk": "^2.1116.0",
     "canvas": "^2.11.2",
     "chart.js": "^3.9.1",
@@ -18,15 +19,18 @@
     "cuid": "^2.1.8",
     "discord.js": "^13.17.1",
     "dotenv": "^10.0.0",
-    "node": "16.6.1",
+    "node": "^18.18.2",
     "node-cron": "^3.0.2",
     "node-fetch": "^2.6.7",
     "opusscript": "0.0.8",
+    "prisma": "^5.7.0",
+    "remeda": "^1.29.0",
     "winston": "^3.3.3",
     "winston-cloudwatch": "^4.0.1",
     "winston-daily-rotate-file": "^4.5.5"
   },
   "devDependencies": {
-    "@types/node-cron": "^3.0.10"
+    "@types/node-cron": "^3.0.10",
+    "ts-node": "^10.9.2"
   }
 }
