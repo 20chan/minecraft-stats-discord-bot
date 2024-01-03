@@ -17,12 +17,14 @@ import {
 import {
   handle as handleBet,
 } from './commands/bet';
+import {
+  handle as handleTTS, voices,
+} from './commands/tts';
 
 dotenv.config();
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const CLIENT_ID = process.env.CLIENT_ID!;
-const GUILD_ID = process.env.GUILD_ID!;
 
 const client = new discord.Client({
   intents: [
@@ -30,6 +32,7 @@ const client = new discord.Client({
     discord.Intents.FLAGS.GUILDS,
     discord.Intents.FLAGS.GUILD_MEMBERS,
     discord.Intents.FLAGS.GUILD_MESSAGES,
+    discord.Intents.FLAGS.GUILD_VOICE_STATES,
   ],
 });
 
@@ -66,11 +69,29 @@ const commands = [
       .setName('일일보상')
       .setDescription('일일 출석 보상 (100~1000) 랜덤 획득')
     ),
+  /*
+new SlashCommandBuilder()
+  .setName('tts')
+  .setDescription('봉칠표 tts')
+  .addSubcommand(subcommand => subcommand
+    .setName('join')
+    .setDescription('채널 참가')
+  )
+  .addSubcommand(subcommand => subcommand
+    .setName('play')
+    .setDescription('음성 채널에서 tts 재생')
+    .addStringOption(option => option.setName('text').setDescription('재생할 텍스트').setRequired(true))
+  )
+  .addSubcommand(subcommand => subcommand
+    .setName('leave')
+    .setDescription('채널 나가기')
+  ),
+  */
 ].map(x => x.toJSON());
 
 async function main() {
   console.log(commands.map(x => x.name));
-  const channel = await client.channels.fetch('1161658078266150973');
+
   client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) {
       return;
@@ -82,19 +103,34 @@ async function main() {
         await handleQuote(client, interaction)
       } else if (interaction.commandName.startsWith('베팅') || interaction.commandName.startsWith('코인')) {
         await handleBet(client, interaction);
+      } else if (interaction.commandName === 'tts') {
+        await handleTTS(client, interaction);
       }
     } catch (error) {
       console.error(error);
-      await interaction.editReply({ content: '오류가 발생했습니다' });
+      await interaction.channel?.send({ content: '오류가 발생했습니다' });
     }
   });
+  client.on('error', console.error);
 
-  const rest = new REST({ version: '9' }).setToken(BOT_TOKEN);
-  await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID) as any, { body: commands });
+
+  client.on('ready', () => {
+    const fn = async () => {
+      const rest = new REST({ version: '9' }).setToken(BOT_TOKEN);
+
+      for (const guildId of client.guilds.cache.map(x => x.id)) {
+        await rest.put(Routes.applicationGuildCommands(CLIENT_ID, guildId) as any, { body: commands });
+
+        try {
+          const guild = await client.guilds.fetch(guildId);
+          await guild.members.fetch();
+        } catch { }
+      }
+    };
+
+    fn();
+  });
   await client.login(BOT_TOKEN);
-
-  const guild = await client.guilds.fetch(GUILD_ID);
-  await guild.members.fetch();
 }
 
 cron.schedule('0 0 * * *', async () => {

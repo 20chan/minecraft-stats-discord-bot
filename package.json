@@ -11,6 +11,7 @@
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.72.0",
     "@discordjs/rest": "^0.3.0",
+    "@discordjs/voice": "^0.16.1",
     "@prisma/client": "^5.7.0",
     "aws-sdk": "^2.1116.0",
     "canvas": "^2.11.2",
@@ -19,6 +20,7 @@
     "cuid": "^2.1.8",
     "discord.js": "^13.17.1",
     "dotenv": "^10.0.0",
+    "libsodium-wrappers": "^0.7.13",
     "node": "^18.18.2",
     "node-cron": "^3.0.2",
     "node-fetch": "^2.6.7",

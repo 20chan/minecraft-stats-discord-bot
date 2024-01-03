@@ -1,12 +1,12 @@
+import dotenv = require('dotenv');
+dotenv.config();
+
 import { createQuoteImage } from './src/commands/quote';
+import { download } from './src/commands/tts';
 
 async function testQuote() {
-  await createQuoteImage({
-    avatarUrl: 'https://avatars.githubusercontent.com/u/16171816',
-    author: '이영찬',
-    content: '모든 다리는 무너지기 전 안전한 다리다',
-    savePath: 'imgs/quotes/test.png',
-  });
+  const url = await download('테스트');
+  console.log(url);
 }
 
 async function main() {
