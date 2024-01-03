@@ -100,6 +100,7 @@ export async function handle(client: discord.Client, interaction: discord.Comman
       }
     }
   } catch (error) {
+    console.error(interaction);
     console.error(error);
     await interaction.reply({ content: '오류가 발생했습니다.' });
   }
@@ -109,9 +110,9 @@ async function startPredict(client: discord.Client, interaction: discord.Command
   const title = interaction.options.getString('주제', true);
   const choices = interaction.options.getString('선택지', true).split(',').map(x => x.trim());
 
-  if (choices.length > 5) {
+  if (choices.length >= 20) {
     await interaction.editReply({
-      content: '선택지는 최대 5개까지 가능합니다.',
+      content: '선택지는 최대 20개까지 가능합니다.',
     });
     return;
   }
@@ -180,6 +181,9 @@ async function startPredict(client: discord.Client, interaction: discord.Command
         .setLabel(x)
         .setStyle('PRIMARY')
     ));
+    const betChunk = R.chunk(betButtons, 5);
+    const actionRows = betChunk.map(x => new discord.MessageActionRow().addComponents(...x));
+
     const endButton = new discord.MessageButton()
       .setCustomId(`betEnd_${entry.id}`)
       .setLabel('종료')
@@ -197,24 +201,29 @@ async function startPredict(client: discord.Client, interaction: discord.Command
         .setLabel('취소')
         .setStyle('SECONDARY'),
     ];
+    const completeChunk = R.chunk(completeButtons, 5);
+    const completeActionRows = completeChunk.map(x => new discord.MessageActionRow().addComponents(...x));
 
-    const buttons = prediction.completed ? [] : prediction.ended ? completeButtons : [...betButtons, endButton];
-
-    const row = new discord.MessageActionRow()
-      .addComponents(...buttons);
+    const components = (
+      prediction.completed
+        ? []
+        : prediction.ended
+          ? [...completeActionRows]
+          : [...actionRows, new discord.MessageActionRow().addComponents(endButton)]
+    );
 
     try {
       await interaction.editReply({
         content: '새로운 예측!',
         embeds: embeds,
-        components: prediction.completed ? [] : [row],
+        components,
       });
     } catch (error) {
       console.error(error);
       await message.edit({
         content: '새로운 예측!',
         embeds: embeds,
-        components: prediction.completed ? [] : [row],
+        components,
       });
     }
   };
@@ -229,14 +238,45 @@ async function startPredict(client: discord.Client, interaction: discord.Command
     time: 1000 * 60 * 60 * 24,
   });
 
-  async function collectHandler(interaction: discord.ButtonInteraction) {
+  const selectCollector = interaction.channel!.createMessageComponentCollector({
+    componentType: 'SELECT_MENU',
+    message,
+    time: 1000 * 60 * 60 * 24,
+  });
+
+  async function collectHandler(interaction: discord.ButtonInteraction | discord.SelectMenuInteraction) {
     const uesrId = interaction.user.id;
     const customId = interaction.customId;
 
-    if (customId.startsWith('bet_')) {
-      const [_, id, choice] = interaction.customId.split('_');
-      const predictionId = parseInt(id, 10);
-      const choiceId = parseInt(choice, 10);
+    if (customId.startsWith('bet_') || customId.startsWith('betselect_')) {
+      const get = () => {
+        if (interaction.isButton()) {
+          const [_, id, choice] = interaction.customId.split('_');
+          const predictionId = parseInt(id, 10);
+          const choiceId = parseInt(choice, 10);
+
+          return {
+            predictionId,
+            choiceId,
+          };
+        } else if (interaction.isSelectMenu()) {
+          const [_, id] = interaction.customId.split('_');
+          const predictionId = parseInt(id, 10);
+          const choiceId = parseInt(interaction.values[0]);
+
+          return {
+            predictionId,
+            choiceId,
+          };
+        }
+
+        throw new Error('what?');
+      }
+
+      const {
+        predictionId,
+        choiceId,
+      } = get();
 
       const prediction = await db.prediction.findUnique({
         where: { id: predictionId },
@@ -557,6 +597,7 @@ async function startPredict(client: discord.Client, interaction: discord.Command
   };
 
   collector.on('collect', collectHandler);
+  selectCollector.on('selectCollector', collectHandler);
 }
 
 async function upsertBet(userId: string, predictionId: number, choiceIndex: number, amount: number) {
