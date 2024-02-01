@@ -63,7 +63,7 @@ export async function handle(client: discord.Client, interaction: discord.Comman
           return;
         }
 
-        const amount = Math.round(Math.random() * 900 + 100);
+        const amount = randomDaily();
         const currentMoney = (await db.money.findUnique({
           where: { id: interaction.user.id },
         }))?.amount ?? initMoney;
@@ -95,7 +95,15 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         });
 
         await interaction.editReply({
-          content: `${amount}${currencyName} 획득! 현재 ${currentMoney + amount}${currencyName}`,
+          content: (
+            amount === 1
+              ? `${amount}${currencyName} 획득 ㅋㅋㅋ 어떻게 ㅋㅋㅋㅋ 현재 ${currentMoney + amount}${currencyName}`
+              : amount <= 5
+                ? `${amount}${currencyName} 획득..? 운이 지지리도 없으시네요... 현재 ${currentMoney + amount}${currencyName}`
+                : amount >= 10000
+                  ? `${amount}${currencyName} 획득!!!! 이거 확률 조작 의심해봐야!!!! 현재 ${currentMoney + amount}${currencyName}`
+                  : `${amount}${currencyName} 획득! 현재 ${currentMoney + amount}${currencyName}`
+          )
         });
       }
     }
@@ -298,10 +306,6 @@ async function startPredict(client: discord.Client, interaction: discord.Command
           new discord.MessageActionRow()
             .addComponents(
               new discord.MessageButton()
-                .setCustomId(`betAmount_${predictionId}_${choiceId}_10`)
-                .setLabel('10')
-                .setStyle('PRIMARY'),
-              new discord.MessageButton()
                 .setCustomId(`betAmount_${predictionId}_${choiceId}_100`)
                 .setLabel('100')
                 .setStyle('PRIMARY'),
@@ -312,6 +316,10 @@ async function startPredict(client: discord.Client, interaction: discord.Command
               new discord.MessageButton()
                 .setCustomId(`betAmount_${predictionId}_${choiceId}_1000`)
                 .setLabel('1000')
+                .setStyle('PRIMARY'),
+              new discord.MessageButton()
+                .setCustomId(`betAmount_${predictionId}_${choiceId}_3000`)
+                .setLabel('3000')
                 .setStyle('PRIMARY'),
             ),
         ],
@@ -628,4 +636,13 @@ async function upsertBet(userId: string, predictionId: number, choiceIndex: numb
       },
     });
   }
+}
+
+export function randomDaily(): number {
+  let x = Math.pow(Math.random(), 100) * 15000;
+  if (x < 1000) {
+    x = Math.pow(Math.random(), 1.5) * 1000;
+  }
+
+  return Math.max(1, Math.floor(x));
 }
