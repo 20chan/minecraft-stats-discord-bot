@@ -115,62 +115,94 @@ export async function handle(client: discord.Client, interaction: discord.Comman
           )
         });
       } else if (subcommand === '리롤') {
-        const daily = await db.dailyReroll.findUnique({
-          where: { id: interaction.user.id },
+        const buttons = [1, 2, 5, 10].map(x => (
+          new discord.MessageButton()
+            .setCustomId(`reroll_${x}`)
+            .setLabel(`x${x}`)
+            .setStyle(x <= 2 ? 'PRIMARY' : 'DANGER')
+        ));
+
+        await interaction.editReply({
+          content: `${rerollPrice}${currencyName}에 리롤을 하시겠습니까? (하루 10번 가능)\n배율은 가격과 받는 보상을 배율대로 증가시킵니다.`,
+          components: [
+            new discord.MessageActionRow().addComponents(...buttons),
+          ],
         });
 
-        const now = new Date();
+        const message = await interaction.fetchReply() as discord.Message<boolean>;
+        const collector = interaction.channel!.createMessageComponentCollector({
+          componentType: 'BUTTON',
+          message,
+          time: 1000 * 60 * 60 * 24,
+        });
 
-        if (daily && compareDate(daily.updatedAt, now)) {
-          if (daily.count >= 10) {
-            await interaction.editReply({
-              content: '리롤은 하루에 10번만 가능합니다.',
+        async function collectHandler(interaction: discord.ButtonInteraction) {
+          const customId = interaction.customId;
+          const multiplier = parseInt(customId.split('_')[1], 10);
+
+          const price = multiplier * rerollPrice;
+
+          const daily = await db.dailyReroll.findUnique({
+            where: { id: interaction.user.id },
+          });
+
+          const now = new Date();
+
+          if (daily && compareDate(daily.updatedAt, now)) {
+            if (daily.count >= 10) {
+              await interaction.reply({
+                content: '리롤은 하루에 10번만 가능합니다.',
+              });
+              return;
+            }
+          }
+
+          const currentMoney = (await db.money.findUnique({
+            where: { id: interaction.user.id },
+          }))?.amount ?? initMoney;
+
+          await db.dailyReroll.upsert({
+            where: { id: interaction.user.id },
+            update: {
+              count: {
+                increment: 1,
+              },
+              updatedAt: new Date(),
+            },
+            create: {
+              id: interaction.user.id,
+              count: 1,
+              updatedAt: new Date(),
+            },
+          })
+
+          if (currentMoney < price) {
+            await interaction.reply({
+              content: `잔고 ${currentMoney}${currencyName}이 리롤 비용 ${price}${currencyName}보다 적습니다.`,
             });
             return;
           }
-        }
 
-        const currentMoney = (await db.money.findUnique({
-          where: { id: interaction.user.id },
-        }))?.amount ?? initMoney;
+          const amount = randomDaily() * multiplier;
+          const newMoney = await charge(interaction.user.id, amount - price);
 
-        await db.dailyReroll.upsert({
-          where: { id: interaction.user.id },
-          update: {
-            count: {
-              increment: 1,
-            },
-            updatedAt: new Date(),
-          },
-          create: {
-            id: interaction.user.id,
-            count: 1,
-            updatedAt: new Date(),
-          },
-        })
-
-        if (currentMoney < rerollPrice) {
-          await interaction.editReply({
-            content: `잔고 ${currentMoney}${currencyName}이 리롤 비용 ${rerollPrice}${currencyName}보다 적습니다.`,
+          const pre = `${interaction.user.username}님의 ${price}${currencyName}어치 배율 x${multiplier} 리롤 결과\n`;
+          await interaction.reply({
+            content: (
+              amount <= 10
+                ? `${pre}고작 ${amount}${currencyName} 획득하셨는데 이러려고 ${price}${currencyName}이나 내셨나요? 현재 ${newMoney}${currencyName}`
+                : amount <= price
+                  ? `${pre}${amount}${currencyName} 획득..? 손해좀 보셨네요.. 현재 ${newMoney}${currencyName}`
+                  : amount <= 1000
+                    ? `${pre}${amount}${currencyName} 획득! 나쁘지 않네요. 현재 ${newMoney}${currencyName}`
+                    : amount >= 10000
+                      ? `${pre}${amount}${currencyName} 획득!!!! 이거 확률 조작 의심해봐야!!!! 현재 ${newMoney}${currencyName}`
+                      : `${pre}${amount}${currencyName} 획득! 현재 ${newMoney}${currencyName}`
+            )
           });
-          return;
         }
 
-        const amount = randomDaily();
-        const newMoney = await charge(interaction.user.id, amount);
-        await interaction.editReply({
-          content: (
-            amount <= 10
-              ? `고작 ${amount}${currencyName} 획득하셨는데 이러려고 ${rerollPrice}${currencyName}이나 내셨나요? 현재 ${newMoney}${currencyName}`
-              : amount <= rerollPrice
-                ? `${amount}${currencyName} 획득..? 손해좀 보셨네요.. 현재 ${newMoney}${currencyName}`
-                : amount <= 1000
-                  ? `${amount}${currencyName} 획득! 나쁘지 않네요. 현재 ${newMoney}${currencyName}`
-                  : amount >= 10000
-                    ? `${amount}${currencyName} 획득!!!! 이거 확률 조작 의심해봐야!!!! 현재 ${newMoney}${currencyName}`
-                    : `${amount}${currencyName} 획득! 현재 ${newMoney}${currencyName}`
-          )
-        });
+        collector.on('collect', collectHandler);
       }
     }
   } catch (error) {

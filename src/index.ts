@@ -77,7 +77,7 @@ const commands = [
     )
     .addSubcommand(subcommand => subcommand
       .setName('리롤')
-      .setDescription('400원 지불하고 일일 출석 보상 (1~30000) 한번 더 받기, 하루 10번 제한')
+      .setDescription('500원 지불하고 일일 출석 보상 (1~30000) 한번 더 받기, 하루 10번 제한')
     ),
   /*
 new SlashCommandBuilder()
