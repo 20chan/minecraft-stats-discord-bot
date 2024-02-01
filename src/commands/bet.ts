@@ -168,20 +168,35 @@ export async function handle(client: discord.Client, interaction: discord.Comman
             return;
           }
 
-          await db.dailyReroll.upsert({
-            where: { id: interaction.user.id },
-            update: {
-              count: {
-                increment: 1,
+          if (daily && compareDate(daily.updatedAt, now)) {
+            await db.dailyReroll.upsert({
+              where: { id: interaction.user.id },
+              update: {
+                count: {
+                  increment: 1,
+                },
+                updatedAt: new Date(),
               },
-              updatedAt: new Date(),
-            },
-            create: {
-              id: interaction.user.id,
-              count: 1,
-              updatedAt: new Date(),
-            },
-          })
+              create: {
+                id: interaction.user.id,
+                count: 1,
+                updatedAt: new Date(),
+              },
+            })
+          } else {
+            await db.dailyReroll.upsert({
+              where: { id: interaction.user.id },
+              update: {
+                count: 1,
+                updatedAt: new Date(),
+              },
+              create: {
+                id: interaction.user.id,
+                count: 1,
+                updatedAt: new Date(),
+              },
+            })
+          }
 
           const amount = randomDaily() * multiplier;
           const newMoney = await charge(interaction.user.id, amount - price);
