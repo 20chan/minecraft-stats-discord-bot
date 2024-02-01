@@ -161,6 +161,13 @@ export async function handle(client: discord.Client, interaction: discord.Comman
             where: { id: interaction.user.id },
           }))?.amount ?? initMoney;
 
+          if (currentMoney < price) {
+            await interaction.reply({
+              content: `잔고 ${currentMoney}${currencyName}이 리롤 비용 ${price}${currencyName}보다 적습니다.`,
+            });
+            return;
+          }
+
           await db.dailyReroll.upsert({
             where: { id: interaction.user.id },
             update: {
@@ -176,17 +183,10 @@ export async function handle(client: discord.Client, interaction: discord.Comman
             },
           })
 
-          if (currentMoney < price) {
-            await interaction.reply({
-              content: `잔고 ${currentMoney}${currencyName}이 리롤 비용 ${price}${currencyName}보다 적습니다.`,
-            });
-            return;
-          }
-
           const amount = randomDaily() * multiplier;
           const newMoney = await charge(interaction.user.id, amount - price);
 
-          const pre = `${interaction.user.username}님의 ${price}${currencyName}어치 배율 x${multiplier} 리롤 결과\n`;
+          const pre = `${interaction.user} 님의 ${price}${currencyName}어치 배율 x${multiplier} 리롤 결과\n`;
           await interaction.reply({
             content: (
               amount <= 10
