@@ -66,12 +66,18 @@ const commands = [
       .setDescription('전체 코인 랭킹 확인')
     )
     .addSubcommand(subcommand => subcommand
+      .setName('송금')
+      .setDescription('어드민 전용^^7')
+      .addStringOption(option => option.setName('id').setDescription('id').setRequired(true))
+      .addIntegerOption(option => option.setName('amount').setDescription('amount').setRequired(true))
+    )
+    .addSubcommand(subcommand => subcommand
       .setName('일일보상')
-      .setDescription('일일 출석 보상 (1~15000) 랜덤 획득')
+      .setDescription('일일 출석 보상 (1~30000) 랜덤 획득')
     )
     .addSubcommand(subcommand => subcommand
       .setName('리롤')
-      .setDescription('600원 지불하고 일일 출석 보상 (1~15000) 한번 더 받기')
+      .setDescription('400원 지불하고 일일 출석 보상 (1~30000) 한번 더 받기, 하루 10번 제한')
     ),
   /*
 new SlashCommandBuilder()

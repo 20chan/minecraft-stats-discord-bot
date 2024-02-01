@@ -21,6 +21,12 @@ model DailyReward {
   updatedAt DateTime @default(now())
 }
 
+model DailyReroll {
+  id String @id
+  count Int
+  updatedAt DateTime @default(now())
+}
+
 model Prediction {
   id Int @id @default(autoincrement())
   title String

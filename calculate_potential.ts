@@ -5,7 +5,7 @@ import { randomDaily } from './src/commands/bet';
 const results = [...new Array(15)].map(_ => 0)
 
 let i = 0;
-const iter = 100;
+const iter = 1000;
 let resultAvg = 0;
 while (i++ < iter) {
   let avg = 0;

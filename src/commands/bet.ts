@@ -3,7 +3,7 @@ import * as R from 'remeda';
 import { db } from '../db';
 
 const initMoney = 10000;
-const rerollPrice = 600;
+const rerollPrice = 500;
 const currencyName = '코인';
 
 export async function handle(client: discord.Client, interaction: discord.CommandInteraction) {
@@ -50,6 +50,29 @@ export async function handle(client: discord.Client, interaction: discord.Comman
               ),
           ],
         });
+      } else if (subcommand === '송금') {
+        if (interaction.user.id !== '268210869341650945') {
+          await interaction.editReply({
+            content: '권한이 없습니다.',
+          });
+          return;
+        }
+
+        const id = interaction.options.getString('id', true);
+        const amount = interaction.options.getInteger('amount', true);
+
+        const target = await client.users.fetch(id);
+        if (!target) {
+          await interaction.editReply({
+            content: '유저를 찾을 수 없습니다.',
+          });
+          return;
+        }
+
+        await charge(id, amount);
+        await interaction.editReply({
+          content: `${target.username}님에게 ${amount}${currencyName}을 지급했습니다.`,
+        });
       } else if (subcommand === '일일보상') {
         const daily = await db.dailyReward.findUnique({
           where: { id: interaction.user.id },
@@ -57,7 +80,7 @@ export async function handle(client: discord.Client, interaction: discord.Comman
 
         const now = new Date();
 
-        if (daily && daily.updatedAt.getDate() === now.getDate() && daily.updatedAt.getMonth() === now.getMonth() && daily.updatedAt.getFullYear() === now.getFullYear()) {
+        if (daily && compareDate(daily.updatedAt, now)) {
           await interaction.editReply({
             content: '일일 보상을 이미 받았습니다',
           });
@@ -65,22 +88,7 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         }
 
         const amount = randomDaily();
-        const currentMoney = (await db.money.findUnique({
-          where: { id: interaction.user.id },
-        }))?.amount ?? initMoney;
-
-        await db.money.upsert({
-          where: { id: interaction.user.id },
-          update: {
-            amount: {
-              increment: amount,
-            },
-          },
-          create: {
-            id: interaction.user.id,
-            amount: initMoney + amount,
-          },
-        });
+        const newMoney = await charge(interaction.user.id, amount);
 
         await db.dailyReward.upsert({
           where: { id: interaction.user.id },
@@ -98,18 +106,48 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         await interaction.editReply({
           content: (
             amount === 1
-              ? `${amount}${currencyName} 획득 ㅋㅋㅋ 어떻게 ㅋㅋㅋㅋ 현재 ${currentMoney + amount}${currencyName}`
+              ? `${amount}${currencyName} 획득 ㅋㅋㅋ 어떻게 ㅋㅋㅋㅋ 현재 ${newMoney}${currencyName}`
               : amount <= 5
-                ? `${amount}${currencyName} 획득..? 운이 지지리도 없으시네요... 현재 ${currentMoney + amount}${currencyName}`
+                ? `${amount}${currencyName} 획득..? 운이 지지리도 없으시네요... 현재 ${newMoney}${currencyName}`
                 : amount >= 10000
-                  ? `${amount}${currencyName} 획득!!!! 이거 확률 조작 의심해봐야!!!! 현재 ${currentMoney + amount}${currencyName}`
-                  : `${amount}${currencyName} 획득! 현재 ${currentMoney + amount}${currencyName}`
+                  ? `${amount}${currencyName} 획득!!!! 이거 확률 조작 의심해봐야!!!! 현재 ${newMoney}${currencyName}`
+                  : `${amount}${currencyName} 획득! 현재 ${newMoney}${currencyName}`
           )
         });
       } else if (subcommand === '리롤') {
+        const daily = await db.dailyReroll.findUnique({
+          where: { id: interaction.user.id },
+        });
+
+        const now = new Date();
+
+        if (daily && compareDate(daily.updatedAt, now)) {
+          if (daily.count >= 10) {
+            await interaction.editReply({
+              content: '리롤은 하루에 10번만 가능합니다.',
+            });
+            return;
+          }
+        }
+
         const currentMoney = (await db.money.findUnique({
           where: { id: interaction.user.id },
         }))?.amount ?? initMoney;
+
+        await db.dailyReroll.upsert({
+          where: { id: interaction.user.id },
+          update: {
+            count: {
+              increment: 1,
+            },
+            updatedAt: new Date(),
+          },
+          create: {
+            id: interaction.user.id,
+            count: 1,
+            updatedAt: new Date(),
+          },
+        })
 
         if (currentMoney < rerollPrice) {
           await interaction.editReply({
@@ -119,26 +157,12 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         }
 
         const amount = randomDaily();
-
-        await db.money.upsert({
-          where: { id: interaction.user.id },
-          update: {
-            amount: {
-              increment: amount - rerollPrice,
-            },
-          },
-          create: {
-            id: interaction.user.id,
-            amount: initMoney + amount - rerollPrice,
-          },
-        });
-
-        const newMoney = currentMoney + amount - rerollPrice;
+        const newMoney = await charge(interaction.user.id, amount);
         await interaction.editReply({
           content: (
             amount <= 10
-              ? `고작 ${amount}${currencyName} 획득하셨는데 이러려고 600원이나 내셨나요? 현재 ${newMoney}${currencyName}`
-              : amount <= 600
+              ? `고작 ${amount}${currencyName} 획득하셨는데 이러려고 ${rerollPrice}${currencyName}이나 내셨나요? 현재 ${newMoney}${currencyName}`
+              : amount <= rerollPrice
                 ? `${amount}${currencyName} 획득..? 손해좀 보셨네요.. 현재 ${newMoney}${currencyName}`
                 : amount <= 1000
                   ? `${amount}${currencyName} 획득! 나쁘지 않네요. 현재 ${newMoney}${currencyName}`
@@ -680,8 +704,42 @@ async function upsertBet(userId: string, predictionId: number, choiceIndex: numb
   }
 }
 
+function compareDate(a: Date, b: Date) {
+  if (a.getDate() !== b.getDate()) {
+    return false;
+  }
+  if (a.getMonth() !== b.getMonth()) {
+    return false;
+  }
+  if (a.getFullYear() !== b.getFullYear()) {
+    return false;
+  }
+  return true;
+}
+
+async function charge(id: string, amount: number) {
+  const currentMoney = (await db.money.findUnique({
+    where: { id: id },
+  }))?.amount ?? initMoney;
+
+  await db.money.upsert({
+    where: { id: id },
+    update: {
+      amount: {
+        increment: amount,
+      },
+    },
+    create: {
+      id: id,
+      amount: initMoney + amount,
+    },
+  });
+
+  return currentMoney + amount;
+}
+
 export function randomDaily(): number {
-  let x = Math.pow(Math.random(), 100) * 15000;
+  let x = Math.pow(Math.random(), 80) * 30000;
   if (x < 1000) {
     x = Math.pow(Math.random(), 1.5) * 1000;
   }

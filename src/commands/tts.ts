@@ -159,7 +159,7 @@ export const voices = [
   ['아재', '636b1d81b58379d5c6b6aeeb'],
   ['셜록', '63da42a2dbbf266ceb0b0fb2'],
   ['남잼민', '5ffda49bcba8f6d3d46fc447'],
-  ['찬구', '5c3c52c95827e00008dd7f34'],
+  ['찬구', '5ffda49bcba8f6d3d46fc447'],
   ['여잼민', '5ffda44bcba8f6d3d46fc41f'],
   ['할배', '61945d9c2c11c2c9fd934340'],
   ['누나', '6568164fe05ddffee8b0e271'],
