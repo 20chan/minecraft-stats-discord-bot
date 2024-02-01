@@ -3,6 +3,7 @@ import * as R from 'remeda';
 import { db } from '../db';
 
 const initMoney = 10000;
+const rerollPrice = 600;
 const currencyName = '코인';
 
 export async function handle(client: discord.Client, interaction: discord.CommandInteraction) {
@@ -103,6 +104,47 @@ export async function handle(client: discord.Client, interaction: discord.Comman
                 : amount >= 10000
                   ? `${amount}${currencyName} 획득!!!! 이거 확률 조작 의심해봐야!!!! 현재 ${currentMoney + amount}${currencyName}`
                   : `${amount}${currencyName} 획득! 현재 ${currentMoney + amount}${currencyName}`
+          )
+        });
+      } else if (subcommand === '리롤') {
+        const currentMoney = (await db.money.findUnique({
+          where: { id: interaction.user.id },
+        }))?.amount ?? initMoney;
+
+        if (currentMoney < rerollPrice) {
+          await interaction.editReply({
+            content: `잔고 ${currentMoney}${currencyName}이 리롤 비용 ${rerollPrice}${currencyName}보다 적습니다.`,
+          });
+          return;
+        }
+
+        const amount = randomDaily();
+
+        await db.money.upsert({
+          where: { id: interaction.user.id },
+          update: {
+            amount: {
+              increment: amount - rerollPrice,
+            },
+          },
+          create: {
+            id: interaction.user.id,
+            amount: initMoney + amount - rerollPrice,
+          },
+        });
+
+        const newMoney = currentMoney + amount - rerollPrice;
+        await interaction.editReply({
+          content: (
+            amount <= 10
+              ? `고작 ${amount}${currencyName} 획득하셨는데 이러려고 600원이나 내셨나요? 현재 ${newMoney}${currencyName}`
+              : amount <= 600
+                ? `${amount}${currencyName} 획득..? 손해좀 보셨네요.. 현재 ${newMoney}${currencyName}`
+                : amount <= 1000
+                  ? `${amount}${currencyName} 획득! 나쁘지 않네요. 현재 ${newMoney}${currencyName}`
+                  : amount >= 10000
+                    ? `${amount}${currencyName} 획득!!!! 이거 확률 조작 의심해봐야!!!! 현재 ${newMoney}${currencyName}`
+                    : `${amount}${currencyName} 획득! 현재 ${newMoney}${currencyName}`
           )
         });
       }

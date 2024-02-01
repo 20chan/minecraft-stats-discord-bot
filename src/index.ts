@@ -67,7 +67,11 @@ const commands = [
     )
     .addSubcommand(subcommand => subcommand
       .setName('일일보상')
-      .setDescription('일일 출석 보상 (100~1000) 랜덤 획득')
+      .setDescription('일일 출석 보상 (1~15000) 랜덤 획득')
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('리롤')
+      .setDescription('600원 지불하고 일일 출석 보상 (1~15000) 한번 더 받기')
     ),
   /*
 new SlashCommandBuilder()
