@@ -57,6 +57,8 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         batchHandleQueue(collector, player, interaction.guildId!);
       }
     });
+
+    await getActorId();
     await interaction.editReply('채널에 참가했습니다');
     return;
   } else if (subcommand === 'leave') {

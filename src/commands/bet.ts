@@ -1,8 +1,8 @@
 import * as discord from 'discord.js';
 import * as R from 'remeda';
 import { db } from '../db';
+import { charge, initMoney } from '../money';
 
-const initMoney = 10000;
 const rerollPrice = 500;
 const currencyName = '코인';
 
@@ -115,17 +115,26 @@ export async function handle(client: discord.Client, interaction: discord.Comman
           )
         });
       } else if (subcommand === '리롤') {
-        const buttons = [1, 2, 5, 10].map(x => (
-          new discord.MessageButton()
-            .setCustomId(`reroll_${x}`)
-            .setLabel(`x${x}`)
-            .setStyle(x <= 2 ? 'PRIMARY' : 'DANGER')
-        ));
+        const upperRow = new discord.MessageActionRow().addComponents(
+          ...[1, 2, 5, 10].map(x => (
+            new discord.MessageButton()
+              .setCustomId(`reroll_absolute_${x}`)
+              .setLabel(`x${x}`)
+              .setStyle(x <= 2 ? 'SUCCESS' : 'PRIMARY')
+          )));
+        const lowerRow = new discord.MessageActionRow().addComponents(
+          ...[25, 50, 75, 100].map(x => (
+            new discord.MessageButton()
+              .setCustomId(`reroll_relative_${x}`)
+              .setLabel(`${x}%`)
+              .setStyle(x === 10 ? 'PRIMARY' : 'DANGER')
+          )));
 
         await interaction.editReply({
           content: `${rerollPrice}${currencyName}에 리롤을 하시겠습니까? (하루 10번 가능)\n배율은 가격과 받는 보상을 배율대로 증가시킵니다.`,
           components: [
-            new discord.MessageActionRow().addComponents(...buttons),
+            upperRow,
+            lowerRow,
           ],
         });
 
@@ -138,9 +147,19 @@ export async function handle(client: discord.Client, interaction: discord.Comman
 
         async function collectHandler(interaction: discord.ButtonInteraction) {
           const customId = interaction.customId;
-          const multiplier = parseInt(customId.split('_')[1], 10);
+          const [_, type, value] = customId.split('_');
 
-          const price = multiplier * rerollPrice;
+          const currentMoney = (await db.money.findUnique({
+            where: { id: interaction.user.id },
+          }))?.amount ?? initMoney;
+
+          const multiplier = (
+            type === 'absolute'
+              ? parseInt(value, 10)
+              : currentMoney * parseInt(value, 10) / 100 / rerollPrice
+          );
+
+          const price = Math.floor(multiplier * rerollPrice);
 
           const daily = await db.dailyReroll.findUnique({
             where: { id: interaction.user.id },
@@ -156,10 +175,6 @@ export async function handle(client: discord.Client, interaction: discord.Comman
               return;
             }
           }
-
-          const currentMoney = (await db.money.findUnique({
-            where: { id: interaction.user.id },
-          }))?.amount ?? initMoney;
 
           if (currentMoney < price) {
             await interaction.reply({
@@ -198,22 +213,36 @@ export async function handle(client: discord.Client, interaction: discord.Comman
             })
           }
 
-          const amount = randomDaily() * multiplier;
+          const amount = Math.round(randomDaily() * multiplier);
           const newMoney = await charge(interaction.user.id, amount - price);
 
-          const pre = `${interaction.user} 님의 ${price}${currencyName}어치 배율 x${multiplier} 리롤 결과\n`;
+          const multiplierText = type === 'absolute' ? `x${value}` : `${value}%`;
+          const title = `${interaction.user} 님의 ${price}${currencyName}어치 배율 ${multiplierText} 리롤 결과\n`;
+          const description = amount <= price / 50
+            ? `고작 ${amount}${currencyName} 획득하셨는데 이러려고 ${price}${currencyName}이나 내셨나요? 현재 ${newMoney}${currencyName}`
+            : amount <= price
+              ? `${amount}${currencyName} 획득..? 손해좀 보셨네요.. 현재 ${newMoney}${currencyName}`
+              : amount <= price * 2
+                ? `${amount}${currencyName} 획득! 나쁘지 않네요. 현재 ${newMoney}${currencyName}`
+                : amount >= price * 20
+                  ? `${amount}${currencyName} 획득!!!! 이거 확률 조작 의심해봐야!!!! 현재 ${newMoney}${currencyName}`
+                  : `${amount}${currencyName} 획득! 현재 ${newMoney}${currencyName}`
+            ;
           await interaction.reply({
-            content: (
-              amount <= 10
-                ? `${pre}고작 ${amount}${currencyName} 획득하셨는데 이러려고 ${price}${currencyName}이나 내셨나요? 현재 ${newMoney}${currencyName}`
-                : amount <= price
-                  ? `${pre}${amount}${currencyName} 획득..? 손해좀 보셨네요.. 현재 ${newMoney}${currencyName}`
-                  : amount <= 1000
-                    ? `${pre}${amount}${currencyName} 획득! 나쁘지 않네요. 현재 ${newMoney}${currencyName}`
-                    : amount >= 10000
-                      ? `${pre}${amount}${currencyName} 획득!!!! 이거 확률 조작 의심해봐야!!!! 현재 ${newMoney}${currencyName}`
-                      : `${pre}${amount}${currencyName} 획득! 현재 ${newMoney}${currencyName}`
-            )
+            content: title,
+            embeds: [
+              new discord.MessageEmbed()
+                .setTitle('결과')
+                .setDescription(description)
+                .setColor(amount <= price / 50 ? 'DARK_RED' : amount <= price ? 'RED' : amount <= price * 2 ? 'ORANGE' : amount >= price * 20 ? 'GOLD' : 'GREEN')
+                .addFields(
+                  { name: '리롤 비용', value: `${price}${currencyName}`, inline: true },
+                  { name: '획득', value: `${amount}${currencyName}`, inline: true },
+                  { name: '잔고', value: `${newMoney}${currencyName}`, inline: true },
+                )
+                .setFooter(`${interaction.user.tag} 의 결과`)
+              ,
+            ],
           });
         }
 
@@ -485,18 +514,7 @@ async function startPredict(client: discord.Client, interaction: discord.Command
           return;
         }
 
-        await db.money.upsert({
-          where: { id: interaction.user.id },
-          update: {
-            amount: {
-              decrement: amount,
-            },
-          },
-          create: {
-            id: interaction.user.id,
-            amount: initMoney - amount,
-          },
-        });
+        await charge(interaction.user.id, -amount);
 
         await upsertBet(interaction.user.id, predictionId, choiceIndex, amount);
 
@@ -552,18 +570,7 @@ async function startPredict(client: discord.Client, interaction: discord.Command
         ),
       })).filter(x => x.amount !== 0);
 
-      await Promise.all(usersAmounts.map(x => db.money.upsert({
-        where: { id: x.userId },
-        update: {
-          amount: {
-            increment: x.amount,
-          },
-        },
-        create: {
-          id: x.userId,
-          amount: initMoney + x.amount,
-        },
-      })));
+      await Promise.all(usersAmounts.map(x => charge(x.userId, x.amount)));
 
       await interaction.reply({
         content: '예측이 취소되었습니다.',
@@ -656,18 +663,7 @@ async function startPredict(client: discord.Client, interaction: discord.Command
         }))
         .filter(x => x.amount !== 0);
 
-      await Promise.all(usersAmounts.map(x => db.money.upsert({
-        where: { id: x.userId },
-        update: {
-          amount: {
-            increment: x.amount,
-          },
-        },
-        create: {
-          id: x.userId,
-          amount: initMoney + x.amount,
-        },
-      })));
+      await Promise.all(usersAmounts.map(x => charge(x.userId, x.amount)));
 
       await db.prediction.update({
         where: { id: predictionId },
@@ -762,27 +758,6 @@ function compareDate(a: Date, b: Date) {
     return false;
   }
   return true;
-}
-
-async function charge(id: string, amount: number) {
-  const currentMoney = (await db.money.findUnique({
-    where: { id: id },
-  }))?.amount ?? initMoney;
-
-  await db.money.upsert({
-    where: { id: id },
-    update: {
-      amount: {
-        increment: amount,
-      },
-    },
-    create: {
-      id: id,
-      amount: initMoney + amount,
-    },
-  });
-
-  return currentMoney + amount;
 }
 
 export function randomDaily(): number {
