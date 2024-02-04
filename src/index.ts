@@ -18,7 +18,7 @@ import {
   handle as handleBet,
 } from './commands/bet';
 import {
-  handle as handleTTS, voices,
+  handle as handleTTS,
 } from './commands/tts';
 
 dotenv.config();
@@ -79,24 +79,37 @@ const commands = [
       .setName('리롤')
       .setDescription('500원 지불하고 일일 출석 보상 (1~30000) 한번 더 받기, 하루 10번 제한')
     ),
-  /*
-new SlashCommandBuilder()
-  .setName('tts')
-  .setDescription('봉칠표 tts')
-  .addSubcommand(subcommand => subcommand
-    .setName('join')
-    .setDescription('채널 참가')
-  )
-  .addSubcommand(subcommand => subcommand
-    .setName('play')
-    .setDescription('음성 채널에서 tts 재생')
-    .addStringOption(option => option.setName('text').setDescription('재생할 텍스트').setRequired(true))
-  )
-  .addSubcommand(subcommand => subcommand
-    .setName('leave')
-    .setDescription('채널 나가기')
-  ),
-  */
+  new SlashCommandBuilder()
+    .setName('tts')
+    .setDescription('봉칠표 tts')
+    .addSubcommand(subcommand => subcommand
+      .setName('join')
+      .setDescription('채널 참가')
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('voice')
+      .setDescription('set actor_id')
+      .addStringOption(option => option.setName('actor_id').setDescription('actor_id').setRequired(true))
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('tone')
+      .setDescription('tone')
+      .addStringOption(option => option.setName('tone').setDescription('tone').addChoices(
+        { name: '1', value: '1' },
+        { name: '2', value: '2' },
+        { name: '3', value: '3' },
+        { name: '4', value: '4' },
+      ).setRequired(true))
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('play')
+      .setDescription('음성 채널에서 tts 재생')
+      .addStringOption(option => option.setName('text').setDescription('재생할 텍스트').setRequired(true))
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('leave')
+      .setDescription('채널 나가기')
+    ),
 ].map(x => x.toJSON());
 
 async function main() {
