@@ -2,6 +2,7 @@ import * as discord from 'discord.js';
 import * as R from 'remeda';
 import { db } from '../db';
 import { charge, initMoney } from '../money';
+import { renderTransactions } from '../render';
 
 const rerollPrice = 500;
 const currencyName = '코인';
@@ -247,6 +248,28 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         }
 
         collector.on('collect', collectHandler);
+      } else if (subcommand === '기록') {
+        const optionId = interaction.options.getString('id');
+        const id = optionId ?? interaction.user.id;
+
+        const user = await client.users.fetch(id);
+        if (!user) {
+          await interaction.editReply({
+            content: '유저를 찾을 수 없습니다.',
+          });
+          return;
+        }
+
+        const transactions = await db.transaction.findMany({
+          where: { userId: id },
+          orderBy: { createdAt: 'asc' },
+        });
+        const fileName = await renderTransactions(id, transactions);
+
+        await interaction.editReply({
+          content: `${user.username}님의 코인 변화 기록`,
+          files: [fileName],
+        })
       }
     }
   } catch (error) {

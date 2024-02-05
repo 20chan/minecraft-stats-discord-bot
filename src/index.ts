@@ -78,7 +78,13 @@ const commands = [
     .addSubcommand(subcommand => subcommand
       .setName('리롤')
       .setDescription('500원 지불하고 일일 출석 보상 (1~30000) 한번 더 받기, 하루 10번 제한')
-    ),
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('기록')
+      .setDescription('내 코인 기록 그래프 보기')
+      .addStringOption(option => option.setName('id').setDescription('id').setRequired(false))
+    )
+  ,
   new SlashCommandBuilder()
     .setName('tts')
     .setDescription('봉칠표 tts')

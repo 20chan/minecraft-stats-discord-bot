@@ -2,8 +2,9 @@ import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import { ChartConfiguration } from 'chart.js';
 import fs from 'fs/promises';
 import { UserResult } from './score';
+import { Transaction } from '@prisma/client';
 
-export async function renderImage(users: UserResult[], user: UserResult) {
+export async function renderMcStats(users: UserResult[], user: UserResult) {
   const width = 800;
   const height = 400;
 
@@ -93,4 +94,65 @@ export async function renderImage(users: UserResult[], user: UserResult) {
 
   const buffer = await canvas.renderToBuffer(configuration);
   await fs.writeFile(`./imgs/${user.name}.png`, buffer, 'base64');
+}
+
+export async function renderTransactions(userId: string, transactions: Transaction[]) {
+  const width = 800;
+  const height = 400;
+
+  const canvas = new ChartJSNodeCanvas({ width, height });
+
+  const formatDate = (x: Date) => {
+    const month = x.getMonth() + 1;
+    const date = x.getDate();
+    return `${month}/${date}`;
+  }
+
+  const configuration: ChartConfiguration = {
+    type: 'line' as const,
+    data: {
+      labels: transactions.map(x => formatDate(x.createdAt)),
+      datasets: [
+        {
+          label: 'amount',
+          data: transactions.map(x => x.amount),
+          backgroundColor: 'rgba(255, 255, 255, 0.6)',
+          borderColor: 'rgb(255, 255, 255)',
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      plugins: {
+        legend: {
+          display: false,
+        },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: 'white',
+            font: {
+              size: 14,
+              lineHeight: 1,
+            },
+            padding: 0,
+          },
+        },
+        y: {
+          ticks: {
+            color: 'white',
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.3)',
+          },
+        },
+      },
+    }
+  }
+
+  const buffer = await canvas.renderToBuffer(configuration);
+  const fileName = `./imgs/transactions/${userId}.png`;
+  await fs.writeFile(fileName, buffer, 'base64');
+  return fileName;
 }

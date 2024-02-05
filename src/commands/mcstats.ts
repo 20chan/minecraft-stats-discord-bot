@@ -1,7 +1,7 @@
 import * as discord from 'discord.js';
 import { getUserList } from '../mc';
 import { postProcess } from '../score';
-import { renderImage } from '../render';
+import { renderMcStats } from '../render';
 import { diffSnapshots, getLatestSnapshot } from '../snapshot';
 
 const emojis = {
@@ -48,7 +48,7 @@ export async function handle(client: discord.Client, interaction: discord.Comman
       return;
     }
 
-    await renderImage(total, user);
+    await renderMcStats(total, user);
 
     const oreScoreRank = [...total].sort((a, b) => b.scores.ore - a.scores.ore).findIndex(x => x.name === user.name) + 1;
     const mobScoreRank = [...total].sort((a, b) => b.scores.mob - a.scores.mob).findIndex(x => x.name === user.name) + 1;
