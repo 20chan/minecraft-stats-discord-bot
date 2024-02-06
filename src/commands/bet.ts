@@ -487,6 +487,17 @@ async function startPredict(client: discord.Client, interaction: discord.Command
                 .setLabel('3000')
                 .setStyle('PRIMARY'),
             ),
+          new discord.MessageActionRow()
+            .addComponents(
+              new discord.MessageButton()
+                .setCustomId(`betAmount_${predictionId}_${choiceId}_half`)
+                .setLabel('50%')
+                .setStyle('DANGER'),
+              new discord.MessageButton()
+                .setCustomId(`betAmount_${predictionId}_${choiceId}_all`)
+                .setLabel('ALL IN')
+                .setStyle('DANGER'),
+            ),
         ],
       }) as discord.Message<boolean>;
 
@@ -496,10 +507,29 @@ async function startPredict(client: discord.Client, interaction: discord.Command
         time: 1000 * 60 * 60 * 24,
       });
       collector.on('collect', async interaction => {
+        const currentMoney = (await db.money.findUnique({
+          where: { id: interaction.user.id },
+        }))?.amount ?? initMoney;
+
         const [_, id, choiceId, amountRaw] = interaction.customId.split('_');
         const predictionId = parseInt(id, 10);
         const choiceIndex = parseInt(choiceId, 10);
-        const amount = parseInt(amountRaw, 10);
+
+        const amount = (
+          amountRaw === 'half'
+            ? Math.floor(currentMoney / 2)
+            : amountRaw === 'all'
+              ? currentMoney
+              : parseInt(amountRaw, 10)
+        );
+
+        if (amount <= 0) {
+          await interaction.reply({
+            content: '돈이 부족할지도?',
+            ephemeral: true,
+          });
+          return;
+        }
 
         const prediction = await db.prediction.findUnique({
           where: { id: predictionId },
@@ -524,10 +554,6 @@ async function startPredict(client: discord.Client, interaction: discord.Command
           });
           return;
         }
-
-        const currentMoney = (await db.money.findUnique({
-          where: { id: interaction.user.id },
-        }))?.amount ?? initMoney;
 
         if (currentMoney < amount) {
           await interaction.reply({
