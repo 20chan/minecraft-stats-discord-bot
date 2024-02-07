@@ -84,6 +84,19 @@ const commands = [
       .setDescription('내 코인 기록 그래프 보기')
       .addStringOption(option => option.setName('id').setDescription('id').setRequired(false))
     )
+    .addSubcommand(subcommand => subcommand
+      .setName('최근기록')
+      .setDescription('모두의 최근 코인 기록 그래프 보기')
+      .addStringOption(option => option.setName('기간').setDescription('얼마나?').addChoices(
+        { name: '1일', value: '1' },
+        { name: '3일', value: '3' },
+        { name: '7일', value: '7' },
+      ).setRequired(false))
+      .addStringOption(option => option.setName('type').setDescription('그래프 y축 타입').addChoices(
+        { name: 'linear', value: 'linear' },
+        { name: 'logarithmic', value: 'logarithmic' },
+      ).setRequired(false))
+    )
   ,
   new SlashCommandBuilder()
     .setName('tts')

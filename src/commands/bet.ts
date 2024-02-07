@@ -264,12 +264,34 @@ export async function handle(client: discord.Client, interaction: discord.Comman
           where: { userId: id },
           orderBy: { createdAt: 'asc' },
         });
-        const fileName = await renderTransactions(id, transactions);
+        const users = [...client.users.cache.values()];
+        const fileName = await renderTransactions(id, users, transactions, 'linear');
 
         await interaction.editReply({
           content: `${user.username}님의 코인 변화 기록`,
           files: [fileName],
         })
+      } else if (subcommand === '최근기록') {
+        const duration = parseInt(interaction.options.getString('기간') ?? '1');
+        const ty = interaction.options.getString('type') ?? 'logarithmic';
+        const now = new Date();
+
+        const transactions = await db.transaction.findMany({
+          where: {
+            createdAt: {
+              gte: new Date(now.getTime() - 1000 * 60 * 60 * 24 * duration),
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        const users = [...client.users.cache.values()];
+        const fileName = await renderTransactions(`recent_${duration}`, users, transactions, ty as any);
+
+        await interaction.editReply({
+          content: `최근 ${duration}일 간의 모두의 코인 변화 기록 (${ty})`,
+          files: [fileName],
+        });
       }
     }
   } catch (error) {

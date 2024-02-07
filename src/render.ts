@@ -1,8 +1,10 @@
+import * as R from 'remeda';
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import { ChartConfiguration } from 'chart.js';
 import fs from 'fs/promises';
 import { UserResult } from './score';
 import { Transaction } from '@prisma/client';
+import { User } from 'discord.js';
 
 export async function renderMcStats(users: UserResult[], user: UserResult) {
   const width = 800;
@@ -96,7 +98,7 @@ export async function renderMcStats(users: UserResult[], user: UserResult) {
   await fs.writeFile(`./imgs/${user.name}.png`, buffer, 'base64');
 }
 
-export async function renderTransactions(userId: string, transactions: Transaction[]) {
+export async function renderTransactions(name: string, userEntities: User[], transactions: Transaction[], ty: 'logarithmic' | 'linear') {
   const width = 800;
   const height = 400;
 
@@ -108,24 +110,45 @@ export async function renderTransactions(userId: string, transactions: Transacti
     return `${month}/${date}`;
   }
 
+  const colors = [
+    '#e06c75',
+    '#98c379',
+    '#e5c07b',
+    '#61afef',
+    '#c678dd',
+    '#56b6c2',
+    '#dcdfe4',
+    '#f09862',
+    '#e06cdb',
+  ];
+
+  const users = R.groupBy(transactions, x => x.userId);
+
+  const labels = (
+    Object.keys(users).length === 1
+      ? transactions.map(x => formatDate(x.createdAt))
+      : R.maxBy(Object.values(users), x => x.length)?.map(x => '') || []
+  );
+  const datasets = Object.entries(users).map(([userId, transactions], i) => {
+    return {
+      label: userEntities.find(x => x.id === userId)?.displayName || 'unknown',
+      data: transactions.map(x => x.amount),
+      backgroundColor: `${colors[i % colors.length]}80`,
+      borderColor: colors[i % colors.length],
+      borderWidth: 1,
+    }
+  });
+
   const configuration: ChartConfiguration = {
     type: 'line' as const,
     data: {
-      labels: transactions.map(x => formatDate(x.createdAt)),
-      datasets: [
-        {
-          label: 'amount',
-          data: transactions.map(x => x.amount),
-          backgroundColor: 'rgba(255, 255, 255, 0.6)',
-          borderColor: 'rgb(255, 255, 255)',
-          borderWidth: 1,
-        },
-      ],
+      labels,
+      datasets,
     },
     options: {
       plugins: {
         legend: {
-          display: false,
+          display: true,
         },
       },
       scales: {
@@ -140,6 +163,7 @@ export async function renderTransactions(userId: string, transactions: Transacti
           },
         },
         y: {
+          type: ty,
           ticks: {
             color: 'white',
           },
@@ -152,7 +176,7 @@ export async function renderTransactions(userId: string, transactions: Transacti
   }
 
   const buffer = await canvas.renderToBuffer(configuration);
-  const fileName = `./imgs/transactions/${userId}.png`;
+  const fileName = `./imgs/transactions/${name}.png`;
   await fs.writeFile(fileName, buffer, 'base64');
   return fileName;
 }
