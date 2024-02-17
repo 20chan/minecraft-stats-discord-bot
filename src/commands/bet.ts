@@ -214,7 +214,7 @@ export async function handle(client: discord.Client, interaction: discord.Comman
             })
           }
 
-          const amount = Math.round(randomDaily() * multiplier);
+          const amount = Math.max(1, Math.round(randomDaily() * multiplier));
           const newMoney = await charge(interaction.user.id, amount - price);
 
           const multiplierText = type === 'absolute' ? `x${value}` : `${value}%`;
