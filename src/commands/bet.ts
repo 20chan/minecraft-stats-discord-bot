@@ -731,8 +731,25 @@ async function startPredict(client: discord.Client, interaction: discord.Command
         .map(x => ({
           userId: x.userId,
           amount: Math.min((bets.find(y => x.userId === y.userId)?.amount ?? 0) * 3, x.amount),
+          ty: 'get',
         }))
         .filter(x => x.amount !== 0);
+
+
+      const gainTotal = R.sumBy(usersAmounts, x => x.amount);
+      const lossTotal = R.sumBy(bets.filter(x => x.choiceIndex !== choiceIndex), x => x.amount);
+
+      if (lossTotal > gainTotal) {
+        const lossRate = gainTotal / lossTotal;
+
+        const giveBacks = bets.filter(x => x.choiceIndex !== choiceIndex).map(x => ({
+          userId: x.userId,
+          amount: Math.round(x.amount * (1 - lossRate)),
+          ty: 'giveBack',
+        }));
+
+        usersAmounts.push(...giveBacks);
+      }
 
       await Promise.all(usersAmounts.map(x => charge(x.userId, x.amount)));
 
@@ -746,12 +763,12 @@ async function startPredict(client: discord.Client, interaction: discord.Command
       const resultDesc = (
         correctAmount === 0
           ? `### 예측에 성공한 사람이 없어 ${wrongAmount}${currencyName}이 모두 사라졌습니다.`
-          : `### x${rate} 배율로 ${wrongAmount}${currencyName}이 분배됩니다.`
+          : `### x${rate} 배율로 ${gainTotal}${currencyName}이 분배됩니다.`
       );
       const users = await Promise.all(usersAmounts.map(x => client.users.fetch(x.userId)));
       const amountDesc = usersAmounts.map((x, i) => {
         if (x.amount > 0) {
-          return `${users[i]}님이 ${x.amount}${currencyName} 획득`;
+          return `${users[i]}님이 ${x.amount}${currencyName} 획득${x.ty === 'giveBack' ? ' (반환)' : ''}`;
         } else if (x.amount === 0) {
           return `${users[i]}님은 ${currencyName} 변동 없음`;
         } else if (x.amount < 0) {
