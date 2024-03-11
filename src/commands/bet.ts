@@ -117,14 +117,14 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         });
       } else if (subcommand === '리롤') {
         const upperRow = new discord.MessageActionRow().addComponents(
-          ...[1, 2, 5, 10].map(x => (
+          ...[1, 2, 5, 10, 40].map(x => (
             new discord.MessageButton()
               .setCustomId(`reroll_absolute_${x}`)
               .setLabel(`x${x}`)
               .setStyle(x <= 2 ? 'SUCCESS' : 'PRIMARY')
           )));
         const lowerRow = new discord.MessageActionRow().addComponents(
-          ...[25, 50, 75, 100].map(x => (
+          ...[10, 25, 50, 75, 100].map(x => (
             new discord.MessageButton()
               .setCustomId(`reroll_relative_${x}`)
               .setLabel(`${x}%`)
@@ -153,6 +153,13 @@ export async function handle(client: discord.Client, interaction: discord.Comman
           const currentMoney = (await db.money.findUnique({
             where: { id: interaction.user.id },
           }))?.amount ?? initMoney;
+
+          if (currentMoney >= 30000 && type === 'absolute') {
+            await interaction.reply({
+              content: `3만원 이상의 잔고를 가지고 있을 때는 퍼센티지 리롤만 가능합니다. 인생은 한방이야~`,
+            });
+            return;
+          }
 
           const multiplier = (
             type === 'absolute'
