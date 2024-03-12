@@ -117,14 +117,14 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         });
       } else if (subcommand === '리롤') {
         const upperRow = new discord.MessageActionRow().addComponents(
-          ...[1, 2, 5, 10, 40].map(x => (
+          ...[1, 2, 5].map(x => (
             new discord.MessageButton()
               .setCustomId(`reroll_absolute_${x}`)
               .setLabel(`x${x}`)
               .setStyle(x <= 2 ? 'SUCCESS' : 'PRIMARY')
           )));
         const lowerRow = new discord.MessageActionRow().addComponents(
-          ...[10, 25, 50, 75, 100].map(x => (
+          ...[10, 30, 50, 70, 90].map(x => (
             new discord.MessageButton()
               .setCustomId(`reroll_relative_${x}`)
               .setLabel(`${x}%`)
