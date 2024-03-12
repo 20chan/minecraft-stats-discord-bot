@@ -882,7 +882,42 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
         .setFooter(`${interaction.user.tag} 의 결과`)
       ,
     ],
+    components: [
+      new discord.MessageActionRow().addComponents(
+        new discord.MessageButton()
+          .setCustomId(`again`)
+          .setLabel(`한번 더`)
+          .setStyle('PRIMARY')
+      ),
+    ],
   });
+
+  const message = await interaction.fetchReply() as discord.Message<boolean>;
+  const collector = interaction.channel!.createMessageComponentCollector({
+    componentType: 'BUTTON',
+    message,
+    time: 1000 * 60 * 60 * 24,
+  });
+
+  async function collectHandler(interaction0: discord.ButtonInteraction) {
+    await interaction0.deferReply();
+
+    const last = await db.dailyReroll.findUnique({
+      where: { id: interaction0.user.id },
+    });
+
+    if (!last) {
+      await interaction0.editReply({
+        content: '리롤 기록이 없습니다.',
+      });
+      return;
+    }
+
+    const [type, value] = last.command.split('_');
+    await reroll(interaction0, type as any, value, true);
+  }
+
+  collector.on('collect', collectHandler);
 }
 
 function compareDate(a: Date, b: Date) {
