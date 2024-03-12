@@ -33,6 +33,7 @@ model DailyReroll {
   id String @id
   count Int
   updatedAt DateTime @default(now())
+  command String
 }
 
 model Prediction {

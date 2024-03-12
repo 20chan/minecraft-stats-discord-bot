@@ -99,6 +99,10 @@ const commands = [
     )
   ,
   new SlashCommandBuilder()
+    .setName('again')
+    .setDescription('마지막으로 한 리롤 한번 더')
+  ,
+  new SlashCommandBuilder()
     .setName('tts')
     .setDescription('봉칠표 tts')
     .addSubcommand(subcommand => subcommand
@@ -143,7 +147,7 @@ async function main() {
         await handleMcstats(client, interaction);
       } else if (interaction.commandName === '명언') {
         await handleQuote(client, interaction)
-      } else if (interaction.commandName.startsWith('베팅') || interaction.commandName.startsWith('코인')) {
+      } else if (interaction.commandName.startsWith('베팅') || interaction.commandName.startsWith('코인') || interaction.commandName === 'again') {
         await handleBet(client, interaction);
       } else if (interaction.commandName === 'tts') {
         await handleTTS(client, interaction);
