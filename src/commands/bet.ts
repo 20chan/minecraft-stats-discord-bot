@@ -122,7 +122,12 @@ export async function handle(client: discord.Client, interaction: discord.Comman
               .setCustomId(`reroll_absolute_${x}`)
               .setLabel(`x${x}`)
               .setStyle(x <= 2 ? 'SUCCESS' : 'PRIMARY')
-          )));
+          )),
+          new discord.MessageButton()
+            .setCustomId('reroll_random_1-100')
+            .setLabel('x1~100')
+            .setStyle('SECONDARY')
+        );
         const lowerRow = new discord.MessageActionRow().addComponents(
           ...[10, 30, 50, 70, 90].map(x => (
             new discord.MessageButton()
@@ -161,11 +166,23 @@ export async function handle(client: discord.Client, interaction: discord.Comman
             return;
           }
 
-          const multiplier = (
-            type === 'absolute'
-              ? parseInt(value, 10)
-              : currentMoney * parseInt(value, 10) / 100 / rerollPrice
-          );
+          const getMultiplier = () => {
+            if (type === 'absolute') {
+              return parseInt(value, 10);
+            } else if (type === 'relative') {
+              return currentMoney * parseInt(value, 10) / 100 / rerollPrice
+            } else if (type === 'random') {
+              const min = parseInt(value.split('-')[0], 10);
+              const max = parseInt(value.split('-')[1], 10);
+              const result = Math.floor(Math.random() * (max - min + 1)) + min;
+
+              return Math.floor(Math.min(result * rerollPrice, currentMoney) / rerollPrice);
+            }
+
+            return 0;
+          }
+
+          const multiplier = getMultiplier();
 
           const price = Math.floor(multiplier * rerollPrice);
 
