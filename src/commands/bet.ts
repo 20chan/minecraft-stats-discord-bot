@@ -3,6 +3,7 @@ import * as R from 'remeda';
 import { db } from '../db';
 import { charge, initMoney } from '../money';
 import { renderTransactions } from '../render';
+import { logger } from '../logger';
 
 const rerollPrice = 500;
 const currencyName = '코인';
@@ -79,9 +80,26 @@ export async function handle(client: discord.Client, interaction: discord.Comman
           where: { id: interaction.user.id },
         });
 
+        logger.info('daily.started', {
+          user: {
+            id: interaction.user.id,
+            username: interaction.user.username,
+          },
+        });
+
         const now = new Date();
 
         if (daily && compareDate(daily.updatedAt, now)) {
+          logger.debug('daily.failed.duplicate', {
+            user: {
+              id: interaction.user.id,
+              username: interaction.user.username,
+            },
+            vars: {
+              dailyUpdatedAt: daily.updatedAt,
+              daily,
+            },
+          });
           await interaction.editReply({
             content: '일일 보상을 이미 받았습니다',
           });
@@ -104,6 +122,16 @@ export async function handle(client: discord.Client, interaction: discord.Comman
           },
         });
 
+        logger.debug('daily.finished', {
+          user: {
+            id: interaction.user.id,
+            username: interaction.user.username,
+          },
+          vars: {
+            amount,
+            newMoney,
+          },
+        });
         await interaction.editReply({
           content: (
             amount === 1
@@ -116,6 +144,13 @@ export async function handle(client: discord.Client, interaction: discord.Comman
           )
         });
       } else if (subcommand === '리롤') {
+        logger.info('reroll.started', {
+          user: {
+            id: interaction.user.id,
+            username: interaction.user.username,
+          },
+        });
+
         const upperRow = new discord.MessageActionRow().addComponents(
           ...[1, 2, 5].map(x => (
             new discord.MessageButton()
@@ -165,6 +200,17 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         const optionId = interaction.options.getString('id');
         const id = optionId ?? interaction.user.id;
 
+        logger.info('transaction.started', {
+          user: {
+            id: interaction.user.id,
+            username: interaction.user.username,
+          },
+          params: {
+            optionId,
+            id,
+          },
+        });
+
         const user = await client.users.fetch(id);
         if (!user) {
           await interaction.editReply({
@@ -188,6 +234,17 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         const duration = parseInt(interaction.options.getString('기간') ?? '1');
         const ty = interaction.options.getString('type') ?? 'logarithmic';
         const now = new Date();
+
+        logger.info('transactionAll.started', {
+          user: {
+            id: interaction.user.id,
+            username: interaction.user.username,
+          },
+          params: {
+            duration,
+            ty,
+          },
+        });
 
         const transactions = await db.transaction.findMany({
           where: {
@@ -233,6 +290,17 @@ export async function handle(client: discord.Client, interaction: discord.Comman
 async function startPredict(client: discord.Client, interaction: discord.CommandInteraction) {
   const title = interaction.options.getString('주제', true);
   const choices = interaction.options.getString('선택지', true).split(',').map(x => x.trim());
+
+  logger.info('predict.started', {
+    user: {
+      id: interaction.user.id,
+      username: interaction.user.username,
+    },
+    params: {
+      title: interaction.options.getString('title', true),
+      choices: interaction.options.getString('choices', true),
+    },
+  });
 
   if (choices.length >= 20) {
     await interaction.editReply({
@@ -402,6 +470,18 @@ async function startPredict(client: discord.Client, interaction: discord.Command
         choiceId,
       } = get();
 
+      logger.info('betMessage.started', {
+        user: {
+          id: interaction.user.id,
+          username: interaction.user.username,
+        },
+        params: {
+          predictionId,
+          choiceId,
+          customId: interaction.customId,
+        },
+      });
+
       const prediction = await db.prediction.findUnique({
         where: { id: predictionId },
       });
@@ -474,6 +554,22 @@ async function startPredict(client: discord.Client, interaction: discord.Command
               : parseInt(amountRaw, 10)
         );
 
+        logger.info('bet.started', {
+          user: {
+            id: interaction.user.id,
+            username: interaction.user.username,
+          },
+          params: {
+            predictionId,
+            choiceId,
+            customId: interaction.customId,
+          },
+          vars: {
+            currentMoney,
+            amount,
+          },
+        });
+
         if (amount <= 0) {
           await interaction.reply({
             content: '돈이 부족할지도?',
@@ -533,6 +629,16 @@ async function startPredict(client: discord.Client, interaction: discord.Command
         where: { id: predictionId },
       });
 
+      logger.info('betCancel.started', {
+        user: {
+          id: interaction.user.id,
+          username: interaction.user.username,
+        },
+        params: {
+          predictionId,
+        },
+      });
+
       if (!prediction) {
         await interaction.reply({
           content: '버근가?',
@@ -585,6 +691,16 @@ async function startPredict(client: discord.Client, interaction: discord.Command
         where: { id: predictionId },
       });
 
+      logger.info('betEnd.started', {
+        user: {
+          id: interaction.user.id,
+          username: interaction.user.username,
+        },
+        params: {
+          predictionId,
+        },
+      });
+
       if (!prediction) {
         await interaction.reply({
           content: '버근가?',
@@ -621,6 +737,17 @@ async function startPredict(client: discord.Client, interaction: discord.Command
 
       const prediction = await db.prediction.findFirst({
         where: { id: predictionId },
+      });
+
+      logger.info('betComplete.started', {
+        user: {
+          id: interaction.user.id,
+          username: interaction.user.username,
+        },
+        params: {
+          predictionId,
+          choiceIndex,
+        },
       });
 
       if (!prediction) {
@@ -679,6 +806,25 @@ async function startPredict(client: discord.Client, interaction: discord.Command
 
         usersAmounts.push(...giveBacks);
       }
+
+      logger.info('betComplete.calc', {
+        user: {
+          id: interaction.user.id,
+          username: interaction.user.username,
+        },
+        params: {
+          predictionId,
+          choiceIndex,
+        },
+        vars: {
+          correctAmount,
+          wrongAmount,
+          rate,
+          gainTotal,
+          lossTotal,
+          usersAmounts,
+        },
+      });
 
       await Promise.all(usersAmounts.map(x => charge(x.userId, x.amount)));
 
@@ -772,6 +918,17 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
   }))?.amount ?? initMoney;
 
   if (currentMoney >= 30000 && type === 'absolute') {
+    logger.debug('reroll.failed.absolute', {
+      user: {
+        id: interaction.user.id,
+        username: interaction.user.username,
+      },
+      vars: {
+        currentMoney,
+        type,
+      },
+    });
+
     await reply({
       content: `3만원 이상의 잔고를 가지고 있을 때는 랜덤 리롤이나 퍼센티지 리롤만 가능합니다. 인생은 한방이야~`,
     });
@@ -788,7 +945,7 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
       const max = parseInt(slug.split('-')[1], 10);
       const result = Math.floor(Math.random() * (max - min + 1)) + min;
 
-      return Math.floor(Math.min(result * rerollPrice, currentMoney) / rerollPrice);
+      return Math.min(result * rerollPrice, currentMoney) / rerollPrice;
     }
 
     return 0;
@@ -804,7 +961,31 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
 
   const now = new Date();
 
+  logger.debug('reroll.calc', {
+    user: {
+      id: interaction.user.id,
+      username: interaction.user.username,
+    },
+    vars: {
+      currentMoney,
+      type,
+      multiplier,
+      price,
+      daily,
+    },
+  });
+
   if (daily && compareDate(daily.updatedAt, now)) {
+    logger.debug('reroll.failed.daily', {
+      user: {
+        id: interaction.user.id,
+        username: interaction.user.username,
+      },
+      vars: {
+        dailyUpdatedAt: daily.updatedAt,
+        daily,
+      },
+    });
     if (daily.count >= 10) {
       await reply({
         content: '리롤은 하루에 10번만 가능합니다.',
@@ -814,6 +995,17 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
   }
 
   if (currentMoney < price) {
+    logger.debug('reroll.failed.amount', {
+      user: {
+        id: interaction.user.id,
+        username: interaction.user.username,
+      },
+      vars: {
+        currentMoney,
+        price,
+      },
+    });
+
     await reply({
       content: `잔고 ${currentMoney}${currencyName}이 리롤 비용 ${price}${currencyName}보다 적습니다.`,
     });
@@ -828,6 +1020,7 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
           increment: 1,
         },
         updatedAt: new Date(),
+        command: `${type}_${slug}`,
       },
       create: {
         id: interaction.user.id,
@@ -842,6 +1035,7 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
       update: {
         count: 1,
         updatedAt: new Date(),
+        command: `${type}_${slug}`,
       },
       create: {
         id: interaction.user.id,

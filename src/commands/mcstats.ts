@@ -3,6 +3,7 @@ import { getUserList } from '../mc';
 import { postProcess } from '../score';
 import { renderMcStats } from '../render';
 import { diffSnapshots, getLatestSnapshot } from '../snapshot';
+import { logger } from '../logger';
 
 const emojis = {
   ancientdebris: '<:ancientdebris:1169654264331784322>',
@@ -175,6 +176,8 @@ export async function reportSnapshot() {
 
   const diffs = diffSnapshots(latest.results, current).filter(x => x.totalScore > 0);
   const length = diffs.length;
+
+  logger.debug('mcstat.reportSnapshot', { latest, current, diffs, length });
 
   if (diffs.length === 0) {
     return;

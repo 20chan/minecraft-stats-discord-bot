@@ -1,9 +1,20 @@
 import * as discord from 'discord.js';
 import { createCanvas, loadImage, CanvasRenderingContext2D } from 'canvas';
 import { writeFile } from 'fs/promises';
+import { logger } from '../logger';
 
 export async function handle(client: discord.Client, interaction: discord.CommandInteraction) {
   await interaction.deferReply({});
+
+  logger.info('quote.started', {
+    user: {
+      id: interaction.user.id,
+      username: interaction.user.username,
+    },
+    params: {
+      url: interaction.options.getString('url', false),
+    }
+  });
 
   const url = interaction.options.getString('url', false);
   if (!url) {
@@ -13,6 +24,16 @@ export async function handle(client: discord.Client, interaction: discord.Comman
 
   const parsed = url.match(/https:\/\/discord.com\/channels\/\d+\/(\d+)\/(\d+)/);
   if (!parsed) {
+    logger.debug('quote.failed.parsed', {
+      user: {
+        id: interaction.user.id,
+        username: interaction.user.username,
+      },
+      params: {
+        url: interaction.options.getString('url', false),
+      },
+    });
+
     interaction.editReply('메시지 url이 잘못됐습니다');
     return;
   }
@@ -22,6 +43,15 @@ export async function handle(client: discord.Client, interaction: discord.Comman
 
   const channel = await client.channels.fetch(channelId) as discord.TextChannel | null;
   if (!channel) {
+    logger.debug('quote.failed.channel', {
+      user: {
+        id: interaction.user.id,
+        username: interaction.user.username,
+      },
+      params: {
+        url: interaction.options.getString('url', false),
+      },
+    });
     interaction.editReply('메시지 url이 잘못됐습니다');
     return;
   }
@@ -47,6 +77,19 @@ export async function handle(client: discord.Client, interaction: discord.Comman
       attachment: savePath,
       name: 'quote.png',
     }],
+  });
+
+  logger.debug('quote.finished', {
+    user: {
+      id: interaction.user.id,
+      username: interaction.user.username,
+    },
+    params: {
+      url: interaction.options.getString('url', false),
+    },
+    vars: {
+      savePath,
+    },
   });
 }
 

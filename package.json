@@ -29,7 +29,8 @@
     "remeda": "^1.29.0",
     "winston": "^3.3.3",
     "winston-cloudwatch": "^4.0.1",
-    "winston-daily-rotate-file": "^4.5.5"
+    "winston-daily-rotate-file": "^4.5.5",
+    "winston-loki": "^6.0.8"
   },
   "devDependencies": {
     "@types/node-cron": "^3.0.10",

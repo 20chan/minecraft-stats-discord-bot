@@ -20,6 +20,7 @@ import {
 import {
   handle as handleTTS,
 } from './commands/tts';
+import { logger } from './logger';
 
 dotenv.config();
 
@@ -138,10 +139,20 @@ const commands = [
 async function main() {
   console.log(commands.map(x => x.name));
 
+  logger.info('bot started', { commands: commands.map(x => x.name) });
+
   client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) {
       return;
     }
+    logger.debug('interaction started', {
+      user: {
+        id: interaction.user.id,
+        username: interaction.user.username,
+      },
+      commandName: interaction.commandName,
+      options: interaction.options.data.map(x => [x.name, x.value]),
+    });
     try {
       if (interaction.commandName === 'mcstats') {
         await handleMcstats(client, interaction);
@@ -153,11 +164,13 @@ async function main() {
         await handleTTS(client, interaction);
       }
     } catch (error) {
-      console.error(error);
+      logger.error('interaction error', error);
       await interaction.channel?.send({ content: '오류가 발생했습니다' });
     }
   });
-  client.on('error', console.error);
+  client.on('error', error => {
+    logger.error('discord client error', { error });
+  });
 
 
   client.on('ready', () => {
