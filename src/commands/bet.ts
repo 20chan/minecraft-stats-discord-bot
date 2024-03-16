@@ -1130,7 +1130,7 @@ function compareDate(a: Date, b: Date) {
 export function randomDaily(): number {
   let x = Math.pow(Math.random(), 80) * 30000;
   if (x < 1000) {
-    x = Math.pow(Math.random(), 1.5) * 1000;
+    x = Math.pow(Math.random(), 0.4) * 1000;
   }
 
   return Math.max(1, Math.floor(x));
