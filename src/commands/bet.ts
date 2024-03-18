@@ -158,10 +158,10 @@ export async function handle(client: discord.Client, interaction: discord.Comman
               .setLabel(`x${x}`)
               .setStyle(x <= 2 ? 'SUCCESS' : 'PRIMARY')
           )),
-          new discord.MessageButton()
-            .setCustomId('reroll_random_1-100')
-            .setLabel('x1~100')
-            .setStyle('SECONDARY')
+          // new discord.MessageButton()
+          //   .setCustomId('reroll_random_1-100')
+          //   .setLabel('x1~100')
+          //   .setStyle('SECONDARY')
         );
         const lowerRow = new discord.MessageActionRow().addComponents(
           ...[10, 30, 50, 70, 90].map(x => (
@@ -1130,7 +1130,7 @@ function compareDate(a: Date, b: Date) {
 export function randomDaily(): number {
   let x = Math.pow(Math.random(), 80) * 30000;
   if (x < 1000) {
-    x = Math.pow(Math.random(), 0.4) * 1000;
+    x = Math.pow(Math.random(), 2) * 1000;
   }
 
   return Math.max(1, Math.floor(x));
