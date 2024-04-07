@@ -196,6 +196,121 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         }
 
         collector.on('collect', collectHandler);
+      } else if (subcommand === '스틸') {
+        const target = interaction.options.getUser('target', true);
+
+        logger.info('steal.started', {
+          user: {
+            id: interaction.user.id,
+            username: interaction.user.username,
+          },
+          target: {
+            id: target.id,
+            username: target.username,
+          },
+        });
+
+        const last = await db.dailyReroll.findUnique({
+          where: {
+            id_type: {
+              id: interaction.user.id,
+              type: 'steal',
+            },
+          },
+        });
+        if (last && compareDate(last.updatedAt, new Date())) {
+          logger.debug('steal.daily.count', {
+            user: {
+              id: interaction.user.id,
+              username: interaction.user.username,
+            },
+            vars: {
+              dailyUpdatedAt: last.updatedAt,
+              last,
+            },
+          });
+
+          if (last.count >= 3) {
+            await interaction.editReply({
+              content: '스틸은 하루 3번만 가능합니다.',
+            });
+            return;
+          }
+        }
+
+        const price = 1000;
+        const userMoney = (await db.money.findUnique({
+          where: { id: interaction.user.id },
+        }))?.amount ?? initMoney;
+
+        if (userMoney < price) {
+          await interaction.editReply({
+            content: '돈이 부족합니다.',
+          });
+          return;
+        }
+
+        const targetMoney = (await db.money.findUnique({
+          where: { id: target.id },
+        }))?.amount ?? initMoney;
+
+        if (userMoney > targetMoney) {
+          await interaction.editReply({
+            content: '상대방의 돈이 더 적습니다.',
+          });
+          return;
+        }
+
+        const amount = Math.min(Math.max(1, Math.round(randomDaily() * 2)), targetMoney);
+        const srcNewMoney = userMoney + amount - price;
+        const targetNewMoney = targetMoney - amount + price;
+
+        await charge(interaction.user.id, amount - price);
+        await charge(target.id, price - amount);
+
+        const lines = [
+          `${interaction.user}님이 ${target}님으로부터 1000${currencyName}을 주고 ${amount}${currencyName}을 훔쳤습니다.`,
+          `${interaction.user}: ${userMoney} → ${srcNewMoney}${currencyName}`,
+          `${target}: ${targetMoney} → ${targetNewMoney}${currencyName}`,
+        ];
+        await interaction.editReply({
+          content: lines.join('\n'),
+        });
+
+        if (last && compareDate(last.updatedAt, new Date())) {
+          await db.dailyReroll.upsert({
+            where: {
+              id_type: {
+                id: interaction.user.id,
+                type: 'steal',
+              },
+            },
+            update: {
+              count: {
+                increment: 1,
+              },
+              updatedAt: new Date(),
+            },
+            create: {
+              id: interaction.user.id,
+              type: 'steal',
+              count: 1,
+              updatedAt: new Date(),
+              command: target.id,
+            },
+          });
+        } else {
+          await db.dailyReroll.create({
+            data: {
+              id: interaction.user.id,
+              type: 'steal',
+              count: 1,
+              updatedAt: new Date(),
+              command: target.id,
+            },
+          });
+        }
+
       } else if (subcommand === '기록') {
         const optionId = interaction.options.getString('id');
         const id = optionId ?? interaction.user.id;
@@ -267,7 +382,12 @@ export async function handle(client: discord.Client, interaction: discord.Comman
       await interaction.deferReply({});
 
       const last = await db.dailyReroll.findUnique({
-        where: { id: interaction.user.id },
+        where: {
+          id_type: {
+            id: interaction.user.id,
+            type: 'daily',
+          },
+        },
       });
 
       if (!last) {
@@ -297,8 +417,8 @@ async function startPredict(client: discord.Client, interaction: discord.Command
       username: interaction.user.username,
     },
     params: {
-      title: interaction.options.getString('title', true),
-      choices: interaction.options.getString('choices', true),
+      title,
+      choices,
     },
   });
 
@@ -956,7 +1076,12 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
   const price = Math.floor(multiplier * rerollPrice);
 
   const daily = await db.dailyReroll.findUnique({
-    where: { id: interaction.user.id },
+    where: {
+      id_type: {
+        id: interaction.user.id,
+        type: 'daily',
+      },
+    },
   });
 
   const now = new Date();
@@ -976,7 +1101,7 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
   });
 
   if (daily && compareDate(daily.updatedAt, now)) {
-    logger.debug('reroll.failed.daily', {
+    logger.debug('reroll.daily.count', {
       user: {
         id: interaction.user.id,
         username: interaction.user.username,
@@ -1014,7 +1139,12 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
 
   if (daily && compareDate(daily.updatedAt, now)) {
     await db.dailyReroll.upsert({
-      where: { id: interaction.user.id },
+      where: {
+        id_type: {
+          id: interaction.user.id,
+          type: 'daily',
+        },
+      },
       update: {
         count: {
           increment: 1,
@@ -1024,6 +1154,7 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
       },
       create: {
         id: interaction.user.id,
+        type: 'daily',
         count: 1,
         updatedAt: new Date(),
         command: `${type}_${slug}`,
@@ -1031,7 +1162,12 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
     })
   } else {
     await db.dailyReroll.upsert({
-      where: { id: interaction.user.id },
+      where: {
+        id_type: {
+          id: interaction.user.id,
+          type: 'daily',
+        },
+      },
       update: {
         count: 1,
         updatedAt: new Date(),
@@ -1039,6 +1175,7 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
       },
       create: {
         id: interaction.user.id,
+        type: 'daily',
         count: 1,
         updatedAt: new Date(),
         command: `${type}_${slug}`,
@@ -1097,7 +1234,12 @@ async function reroll(interaction: discord.ButtonInteraction | discord.CommandIn
     await interaction0.deferReply();
 
     const last = await db.dailyReroll.findUnique({
-      where: { id: interaction0.user.id },
+      where: {
+        id_type: {
+          id: interaction.user.id,
+          type: 'daily',
+        },
+      },
     });
 
     if (!last) {
@@ -1130,7 +1272,7 @@ function compareDate(a: Date, b: Date) {
 export function randomDaily(): number {
   let x = Math.pow(Math.random(), 80) * 30000;
   if (x < 1000) {
-    x = Math.pow(Math.random(), 2) * 1000;
+    x = Math.pow(Math.random(), 1.2) * 1000;
   }
 
   return Math.max(1, Math.floor(x));

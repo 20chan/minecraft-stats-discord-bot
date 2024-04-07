@@ -30,10 +30,13 @@ model DailyReward {
 }
 
 model DailyReroll {
-  id String @id
+  id String
+  type String @default("daily")
   count Int
   updatedAt DateTime @default(now())
   command String
+
+  @@id([id, type])
 }
 
 model Prediction {
@@ -54,4 +57,9 @@ model Bet {
   choiceIndex Int
   userId String
   amount Int
+}
+
+model ChatHistory {
+  id String @id
+  records String
 }

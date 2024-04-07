@@ -1,5 +1,7 @@
-import * as discord from 'discord.js';
 import dotenv = require('dotenv');
+dotenv.config();
+
+import * as discord from 'discord.js';
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
 import { SlashCommandBuilder } from "@discordjs/builders";
@@ -20,9 +22,10 @@ import {
 import {
   handle as handleTTS,
 } from './commands/tts';
+import {
+  handle as handleChat,
+} from './commands/chat';
 import { logger } from './logger';
-
-dotenv.config();
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const CLIENT_ID = process.env.CLIENT_ID!;
@@ -81,6 +84,11 @@ const commands = [
       .setDescription('500원 지불하고 일일 출석 보상 (1~30000) 한번 더 받기, 하루 10번 제한')
     )
     .addSubcommand(subcommand => subcommand
+      .setName('스틸')
+      .setDescription('나보다 더 돈이 많은 상대에게 1000원을 주고 1~30000 (확률 낮음) 뺏어오기, 하루 3번 제한')
+      .addUserOption(option => option.setName('target').setDescription('target').setRequired(true))
+    )
+    .addSubcommand(subcommand => subcommand
       .setName('기록')
       .setDescription('내 코인 기록 그래프 보기')
       .addStringOption(option => option.setName('id').setDescription('id').setRequired(false))
@@ -134,6 +142,9 @@ const commands = [
       .setName('leave')
       .setDescription('채널 나가기')
     ),
+  new SlashCommandBuilder()
+    .setName('chat')
+    .setDescription('스레드 만들어서 챗봇과 대화하기')
 ].map(x => x.toJSON());
 
 async function main() {
@@ -162,6 +173,8 @@ async function main() {
         await handleBet(client, interaction);
       } else if (interaction.commandName === 'tts') {
         await handleTTS(client, interaction);
+      } else if (interaction.commandName === 'chat') {
+        await handleChat(client, interaction);
       }
     } catch (error) {
       logger.error('interaction error', error);
