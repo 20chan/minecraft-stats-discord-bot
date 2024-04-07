@@ -85,7 +85,7 @@ const commands = [
     )
     .addSubcommand(subcommand => subcommand
       .setName('스틸')
-      .setDescription('나보다 더 돈이 많은 상대에게 1000원을 주고 1~30000 (확률 낮음) 뺏어오기, 하루 3번 제한')
+      .setDescription('상대에게 1000원을 주고, 내 전재산 중 1000원만큼의 비율을 상대방 전재산 비율로 도박을 해서 돈을 뺏어온다, 하루 3번 제한')
       .addUserOption(option => option.setName('target').setDescription('target').setRequired(true))
     )
     .addSubcommand(subcommand => subcommand

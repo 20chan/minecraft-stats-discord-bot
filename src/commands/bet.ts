@@ -2,7 +2,7 @@ import * as discord from 'discord.js';
 import * as R from 'remeda';
 import { db } from '../db';
 import { charge, initMoney } from '../money';
-import { renderTransactions } from '../render';
+import { renderRank, renderTransactions } from '../render';
 import { logger } from '../logger';
 
 const rerollPrice = 500;
@@ -37,6 +37,11 @@ export async function handle(client: discord.Client, interaction: discord.Comman
         const users = await Promise.all(moneys.map(x => client.users.fetch(x.id)));
         const userNames = users.map(x => x.username);
         const amounts = moneys.map(x => x.amount);
+
+        const fileName = await renderRank(moneys.map(x => ({
+          name: users.find(y => x.id === y.id)?.displayName ?? '',
+          value: x.amount,
+        })), 'rank');
         await interaction.editReply({
           content: '잔고 랭킹',
           embeds: [
@@ -51,6 +56,7 @@ export async function handle(client: discord.Client, interaction: discord.Comman
                 })),
               ),
           ],
+          files: [fileName],
         });
       } else if (subcommand === '송금') {
         if (interaction.user.id !== '268210869341650945') {
@@ -254,24 +260,49 @@ export async function handle(client: discord.Client, interaction: discord.Comman
           where: { id: target.id },
         }))?.amount ?? initMoney;
 
+        /*
         if (userMoney > targetMoney) {
           await interaction.editReply({
             content: '상대방의 돈이 더 적습니다.',
           });
           return;
         }
+        */
 
-        const amount = Math.min(Math.max(1, Math.round(randomDaily() * 2)), targetMoney);
+        const myRate = 1000 / userMoney;
+        const targetRate = targetMoney * myRate;
+        const multiplier = targetRate / rerollPrice;
+
+        logger.info('steal.calc', {
+          user: {
+            id: interaction.user.id,
+            username: interaction.user.username,
+          },
+          target: {
+            id: target.id,
+            username: target.username,
+          },
+          vars: {
+            userMoney,
+            targetMoney,
+            myRate,
+            targetRate,
+            multiplier,
+          },
+        });
+
+        const amount = Math.min(Math.max(1, Math.round(randomDaily() * multiplier)), targetMoney);
         const srcNewMoney = userMoney + amount - price;
         const targetNewMoney = targetMoney - amount + price;
 
         await charge(interaction.user.id, amount - price);
         await charge(target.id, price - amount);
 
+        const s = (x: number) => (x > 0 ? '+' : '');
         const lines = [
           `${interaction.user}님이 ${target}님으로부터 1000${currencyName}을 주고 ${amount}${currencyName}을 훔쳤습니다.`,
-          `${interaction.user}: ${userMoney} → ${srcNewMoney}${currencyName}`,
-          `${target}: ${targetMoney} → ${targetNewMoney}${currencyName}`,
+          `${interaction.user}: ${userMoney} → ${srcNewMoney}${currencyName} (${s(amount - price)}${amount - price})`,
+          `${target}: ${targetMoney} → ${targetNewMoney}${currencyName} (${s(price - amount)}${price - amount})`,
         ];
         await interaction.editReply({
           content: lines.join('\n'),

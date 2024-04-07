@@ -180,3 +180,78 @@ export async function renderTransactions(name: string, userEntities: User[], tra
   await fs.writeFile(fileName, buffer, 'base64');
   return fileName;
 }
+
+export async function renderRank(entries: Array<{
+  name: string;
+  value: number;
+}>, name: string) {
+  const width = 800;
+  const height = 400;
+
+  const canvas = new ChartJSNodeCanvas({ width, height });
+
+  entries.sort((a, b) => b.value - a.value);
+
+  const colors = [
+    '#e06c75',
+    '#98c379',
+    '#e5c07b',
+    '#61afef',
+    '#c678dd',
+    '#56b6c2',
+    '#dcdfe4',
+    '#f09862',
+    '#e06cdb',
+  ];
+
+  const labels = entries.map(x => x.name);
+  const datasets = [
+    {
+      label: '돈',
+      data: entries.map(x => x.value),
+      backgroundColor: colors[0],
+      borderColor: colors[0],
+      borderWidth: 1,
+    },
+  ];
+
+  const configuration: ChartConfiguration = {
+    type: 'bar' as const,
+    data: {
+      labels,
+      datasets,
+    },
+    options: {
+      plugins: {
+        legend: {
+          display: true,
+        },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: 'white',
+            font: {
+              size: 14,
+              lineHeight: 1,
+            },
+            padding: 0,
+          },
+        },
+        y: {
+          ticks: {
+            color: 'white',
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.3)',
+          },
+        },
+      },
+    }
+  }
+
+  const buffer = await canvas.renderToBuffer(configuration);
+  const fileName = `./imgs/transactions/${name}.png`;
+  await fs.writeFile(fileName, buffer, 'base64');
+  return fileName;
+}
