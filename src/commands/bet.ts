@@ -4,6 +4,7 @@ import { db } from '../db';
 import { charge, initMoney } from '../money';
 import { renderRank, renderTransactions } from '../render';
 import { logger } from '../logger';
+import { adminId } from '../constants';
 
 const rerollPrice = 500;
 const currencyName = '코인';
@@ -16,6 +17,18 @@ export async function handle(client: discord.Client, interaction: discord.Comman
 
       if (subcommand === '시작') {
         await startPredict(client, interaction);
+      } else if (subcommand === '종료') {
+        const predictionId = interaction.options.getInteger('id')!;
+        await endPrediction(interaction, predictionId);
+      } else if (subcommand === '결과') {
+        const predictionId = interaction.options.getInteger('id')!;
+        const choiceIndex = interaction.options.getInteger('index')!;
+
+        await completePrediction(client, interaction, predictionId, choiceIndex);
+
+      } else if (subcommand === '취소') {
+        const predictionId = interaction.options.getInteger('id')!;
+        await cancelPrediction(interaction, predictionId);
       }
     } else if (interaction.commandName === '코인') {
       await interaction.deferReply({});
@@ -236,9 +249,9 @@ export async function handle(client: discord.Client, interaction: discord.Comman
             },
           });
 
-          if (last.count >= 3) {
+          if (last.count > 10) {
             await interaction.editReply({
-              content: '스틸은 하루 3번만 가능합니다.',
+              content: '스틸은 하루 10번만 가능합니다.',
             });
             return;
           }
@@ -260,18 +273,13 @@ export async function handle(client: discord.Client, interaction: discord.Comman
           where: { id: target.id },
         }))?.amount ?? initMoney;
 
-        /*
-        if (userMoney > targetMoney) {
-          await interaction.editReply({
-            content: '상대방의 돈이 더 적습니다.',
-          });
-          return;
-        }
-        */
+        const userMultiplier = userMoney * 0.1 / rerollPrice;
+        const targetMultiplier = targetMoney * 0.1 / rerollPrice;
 
-        const myRate = 1000 / userMoney;
-        const targetRate = targetMoney * myRate;
-        const multiplier = targetRate / rerollPrice;
+        const userAmount = Math.min(Math.max(1, Math.round(randomDaily() * userMultiplier)), userMoney);
+        const targetAmount = Math.min(Math.max(1, Math.round(randomDaily() * targetMultiplier)), Math.min(userMoney * 4, targetMoney));
+        const userNewMoney = userMoney + targetAmount - userAmount;
+        const targetNewMoney = targetMoney - targetAmount + userAmount;
 
         logger.info('steal.calc', {
           user: {
@@ -285,24 +293,21 @@ export async function handle(client: discord.Client, interaction: discord.Comman
           vars: {
             userMoney,
             targetMoney,
-            myRate,
-            targetRate,
-            multiplier,
+            userMultiplier,
+            targetMultiplier,
+            userAmount,
+            targetAmount,
           },
         });
 
-        const amount = Math.min(Math.max(1, Math.round(randomDaily() * multiplier)), targetMoney);
-        const srcNewMoney = userMoney + amount - price;
-        const targetNewMoney = targetMoney - amount + price;
-
-        await charge(interaction.user.id, amount - price);
-        await charge(target.id, price - amount);
+        await charge(interaction.user.id, targetAmount - userAmount);
+        await charge(target.id, userAmount - targetAmount);
 
         const s = (x: number) => (x > 0 ? '+' : '');
         const lines = [
-          `${interaction.user}님이 ${target}님으로부터 1000${currencyName}을 주고 ${amount}${currencyName}을 훔쳤습니다.`,
-          `${interaction.user}: ${userMoney} → ${srcNewMoney}${currencyName} (${s(amount - price)}${amount - price})`,
-          `${target}: ${targetMoney} → ${targetNewMoney}${currencyName} (${s(price - amount)}${price - amount})`,
+          `${interaction.user}님이 ${target}님으로부터 ${userAmount}${currencyName}을 주고 ${targetAmount}${currencyName}을 훔쳤습니다.`,
+          `${interaction.user}: ${userMoney} → ${userNewMoney}${currencyName}`,
+          `${target}: ${targetMoney} → ${targetNewMoney}${currencyName}`,
         ];
         await interaction.editReply({
           content: lines.join('\n'),
@@ -331,8 +336,18 @@ export async function handle(client: discord.Client, interaction: discord.Comman
             },
           });
         } else {
-          await db.dailyReroll.create({
-            data: {
+          await db.dailyReroll.upsert({
+            where: {
+              id_type: {
+                id: interaction.user.id,
+                type: 'steal',
+              },
+            },
+            update: {
+              count: 1,
+              updatedAt: new Date(),
+            },
+            create: {
               id: interaction.user.id,
               type: 'steal',
               count: 1,
@@ -776,109 +791,18 @@ async function startPredict(client: discord.Client, interaction: discord.Command
       });
     } else if (customId.startsWith('betCancel')) {
       const predictionId = parseInt(customId.split('_')[1], 10);
-      const prediction = await db.prediction.findFirst({
-        where: { id: predictionId },
-      });
 
-      logger.info('betCancel.started', {
-        user: {
-          id: interaction.user.id,
-          username: interaction.user.username,
-        },
-        params: {
-          predictionId,
-        },
-      });
-
-      if (!prediction) {
-        await interaction.reply({
-          content: '버근가?',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      if (prediction.userId !== interaction.user.id) {
-        await interaction.reply({
-          content: '내가 만든 예측만 취소할 수 있습니다.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      await db.prediction.update({
-        where: { id: predictionId },
-        data: {
-          completed: true,
-        }
-      });
-
-      const bets = await db.bet.findMany({
-        where: { predictionId },
-      });
-
-      const userIds = R.uniq(bets.map(x => x.userId));
-      const usersAmounts = userIds.map(userId => ({
-        userId,
-        amount: Math.round(
-          bets
-            .filter(x => x.userId === userId)
-            .reduce((acc, x) => acc + x.amount, 0)
-        ),
-      })).filter(x => x.amount !== 0);
-
-      await Promise.all(usersAmounts.map(x => charge(x.userId, x.amount)));
-
-      await interaction.reply({
-        content: '예측이 취소되었습니다.',
-        ephemeral: true,
-      });
+      await interaction.deferReply();
+      await cancelPrediction(interaction as discord.ButtonInteraction, predictionId);
 
       await updateBetMessage();
       clearInterval(interval);
     } else if (customId.startsWith('betEnd_')) {
+      await interaction.deferReply();
+
       const predictionId = parseInt(customId.split('_')[1], 10);
-      const prediction = await db.prediction.findFirst({
-        where: { id: predictionId },
-      });
 
-      logger.info('betEnd.started', {
-        user: {
-          id: interaction.user.id,
-          username: interaction.user.username,
-        },
-        params: {
-          predictionId,
-        },
-      });
-
-      if (!prediction) {
-        await interaction.reply({
-          content: '버근가?',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      if (prediction.userId !== interaction.user.id) {
-        await interaction.reply({
-          content: '내가 만든 예측만 종료할 수 있습니다.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      await db.prediction.update({
-        where: { id: predictionId },
-        data: {
-          ended: true,
-        },
-      });
-
-      await interaction.reply({
-        content: '베팅이 종료되었습니다. 결과가 나오면 빨간색 버튼을 눌러 결과를 선택해주세요',
-        ephemeral: true,
-      });
+      await endPrediction(interaction as discord.ButtonInteraction, predictionId);
 
       await updateBetMessage();
     } else if (customId.startsWith('betComplete_')) {
@@ -886,141 +810,7 @@ async function startPredict(client: discord.Client, interaction: discord.Command
       const predictionId = parseInt(predictionIdRaw, 10);
       const choiceIndex = parseInt(choiceIndexRaw, 10);
 
-      const prediction = await db.prediction.findFirst({
-        where: { id: predictionId },
-      });
-
-      logger.info('betComplete.started', {
-        user: {
-          id: interaction.user.id,
-          username: interaction.user.username,
-        },
-        params: {
-          predictionId,
-          choiceIndex,
-        },
-      });
-
-      if (!prediction) {
-        await interaction.reply({
-          content: '버근가?',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      if (prediction.userId !== interaction.user.id) {
-        await interaction.reply({
-          content: '내가 만든 예측만 결과를 선택할 수 있습니다.',
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const bets = await db.bet.findMany({
-        where: { predictionId },
-      });
-
-      const correctAmount = bets.filter(x => x.choiceIndex === choiceIndex).reduce((acc, x) => acc + x.amount, 0);
-      const wrongAmount = bets.filter(x => x.choiceIndex !== choiceIndex).reduce((acc, x) => acc + x.amount, 0);
-
-      const rate = (correctAmount + wrongAmount) / correctAmount;
-
-      const userIds = R.uniq(bets.map(x => x.userId));
-      const usersAmounts = userIds.map(userId => ({
-        userId,
-        amount: Math.round(
-          bets
-            .filter(x => x.userId === userId)
-            .reduce((acc, x) => acc + x.amount * (x.choiceIndex === choiceIndex ? rate : 0), 0)
-        ),
-      }))
-        .map(x => ({
-          userId: x.userId,
-          amount: Math.min((bets.find(y => x.userId === y.userId)?.amount ?? 0) * 3, x.amount),
-          ty: 'get',
-        }))
-        .filter(x => x.amount !== 0);
-
-
-      const gainTotal = R.sumBy(usersAmounts, x => x.amount);
-      const lossTotal = R.sumBy(bets.filter(x => x.choiceIndex !== choiceIndex), x => x.amount);
-
-      if (lossTotal > gainTotal) {
-        const lossRate = gainTotal / lossTotal;
-
-        const giveBacks = bets.filter(x => x.choiceIndex !== choiceIndex).map(x => ({
-          userId: x.userId,
-          amount: Math.round(x.amount * (1 - lossRate)),
-          ty: 'giveBack',
-        }));
-
-        usersAmounts.push(...giveBacks);
-      }
-
-      logger.info('betComplete.calc', {
-        user: {
-          id: interaction.user.id,
-          username: interaction.user.username,
-        },
-        params: {
-          predictionId,
-          choiceIndex,
-        },
-        vars: {
-          correctAmount,
-          wrongAmount,
-          rate,
-          gainTotal,
-          lossTotal,
-          usersAmounts,
-        },
-      });
-
-      await Promise.all(usersAmounts.map(x => charge(x.userId, x.amount)));
-
-      await db.prediction.update({
-        where: { id: predictionId },
-        data: {
-          completed: true,
-        },
-      });
-
-      const resultDesc = (
-        correctAmount === 0
-          ? `### 예측에 성공한 사람이 없어 ${wrongAmount}${currencyName}이 모두 사라졌습니다.`
-          : `### x${rate} 배율로 ${gainTotal}${currencyName}이 분배됩니다.`
-      );
-      const users = await Promise.all(usersAmounts.map(x => client.users.fetch(x.userId)));
-      const amountDesc = usersAmounts.map((x, i) => {
-        if (x.amount > 0) {
-          return `${users[i]}님이 ${x.amount}${currencyName} 획득${x.ty === 'giveBack' ? ' (반환)' : ''}`;
-        } else if (x.amount === 0) {
-          return `${users[i]}님은 ${currencyName} 변동 없음`;
-        } else if (x.amount < 0) {
-          return `${users[i]}님이 ${Math.round(-x.amount)}${currencyName} 잃음`;
-        }
-      }).join('\n');
-
-
-      await interaction.reply({
-        content: '예측 종료!',
-        embeds: [
-          new discord.MessageEmbed()
-            .setTitle(`[예측 종료] ${title} 결과`)
-            .setDescription(`\`${choices[choiceIndex]}\`이(가) 맞았습니다!\n${resultDesc}\n${amountDesc}`)
-            .addFields(
-              choices.map((x, i) => ({
-                name: x,
-                value: (
-                  bets.filter(x => x.choiceIndex === i).length === 0
-                    ? '..'
-                    : bets.filter(x => x.choiceIndex === i).map(x => `<@${x.userId}> ${i === choiceIndex ? `+${x.amount}` : `${Math.round(-x.amount)}`}`).join('\n')
-                ),
-              })),
-            )
-        ],
-      });
+      await completePrediction(client, interaction as discord.ButtonInteraction, predictionId, choiceIndex);
 
       await updateBetMessage();
       clearInterval(interval);
@@ -1029,6 +819,247 @@ async function startPredict(client: discord.Client, interaction: discord.Command
 
   collector.on('collect', collectHandler);
   selectCollector.on('selectCollector', collectHandler);
+}
+
+async function endPrediction(interaction: discord.ButtonInteraction | discord.CommandInteraction, predictionId: number) {
+  const prediction = await db.prediction.findFirst({
+    where: { id: predictionId },
+  });
+
+  logger.info('betEnd.started', {
+    user: {
+      id: interaction.user.id,
+      username: interaction.user.username,
+    },
+    params: {
+      predictionId,
+    },
+  });
+
+  if (!prediction || prediction.ended || prediction.completed) {
+    await interaction.editReply({
+      content: '버근가?',
+    });
+    return;
+  }
+
+  if (prediction.userId !== interaction.user.id && interaction.user.id !== adminId) {
+    await interaction.editReply({
+      content: '내가 만든 예측만 종료할 수 있습니다.',
+    });
+    return;
+  }
+
+  await db.prediction.update({
+    where: { id: predictionId },
+    data: {
+      ended: true,
+    },
+  });
+
+  await interaction.editReply({
+    content: '베팅이 종료되었습니다. 결과가 나오면 빨간색 버튼을 눌러 결과를 선택해주세요',
+  });
+}
+
+async function completePrediction(client: discord.Client, interaction: discord.ButtonInteraction | discord.CommandInteraction, predictionId: number, choiceIndex: number) {
+  const prediction = await db.prediction.findFirst({
+    where: { id: predictionId },
+  });
+
+  logger.info('betComplete.started', {
+    user: {
+      id: interaction.user.id,
+      username: interaction.user.username,
+    },
+    params: {
+      predictionId,
+      choiceIndex,
+    },
+  });
+
+  if (!prediction || !prediction.ended || prediction.completed) {
+    await interaction.editReply({
+      content: '잘못된? id 네요?',
+    });
+    return;
+  }
+
+  const choices = JSON.parse(prediction.valueSerialized) as string[];
+
+  if (prediction.userId !== interaction.user.id && interaction.user.id !== adminId) {
+    await interaction.editReply({
+      content: '내가 만든 예측만 결과를 선택할 수 있습니다.',
+    });
+    return;
+  }
+
+  const bets = await db.bet.findMany({
+    where: { predictionId },
+  });
+
+  const correctAmount = bets.filter(x => x.choiceIndex === choiceIndex).reduce((acc, x) => acc + x.amount, 0);
+  const wrongAmount = bets.filter(x => x.choiceIndex !== choiceIndex).reduce((acc, x) => acc + x.amount, 0);
+
+  const rate = (correctAmount + wrongAmount) / correctAmount;
+
+  const userIds = R.uniq(bets.map(x => x.userId));
+  const usersAmounts = userIds.map(userId => ({
+    userId,
+    amount: Math.round(
+      bets
+        .filter(x => x.userId === userId)
+        .reduce((acc, x) => acc + x.amount * (x.choiceIndex === choiceIndex ? rate : 0), 0)
+    ),
+  }))
+    .map(x => ({
+      userId: x.userId,
+      amount: Math.min((bets.find(y => x.userId === y.userId)?.amount ?? 0) * 3, x.amount),
+      ty: 'get',
+    }))
+    .filter(x => x.amount !== 0);
+
+
+  const gainTotal = R.sumBy(usersAmounts, x => x.amount);
+  const lossTotal = R.sumBy(bets.filter(x => x.choiceIndex !== choiceIndex), x => x.amount);
+
+  if (lossTotal > gainTotal) {
+    const lossRate = gainTotal / lossTotal;
+
+    const giveBacks = bets.filter(x => x.choiceIndex !== choiceIndex).map(x => ({
+      userId: x.userId,
+      amount: Math.round(x.amount * (1 - lossRate)),
+      ty: 'giveBack',
+    }));
+
+    usersAmounts.push(...giveBacks);
+  }
+
+  logger.info('betComplete.calc', {
+    user: {
+      id: interaction.user.id,
+      username: interaction.user.username,
+    },
+    params: {
+      predictionId,
+      choiceIndex,
+    },
+    vars: {
+      correctAmount,
+      wrongAmount,
+      rate,
+      gainTotal,
+      lossTotal,
+      usersAmounts,
+    },
+  });
+
+  await Promise.all(usersAmounts.map(x => charge(x.userId, x.amount)));
+
+  await db.prediction.update({
+    where: { id: predictionId },
+    data: {
+      completed: true,
+    },
+  });
+
+  const resultDesc = (
+    correctAmount === 0
+      ? `### 예측에 성공한 사람이 없어 ${wrongAmount}${currencyName}이 모두 사라졌습니다.`
+      : `### x${rate} 배율로 ${gainTotal}${currencyName}이 분배됩니다.`
+  );
+  const users = await Promise.all(usersAmounts.map(x => client.users.fetch(x.userId)));
+  const amountDesc = usersAmounts.map((x, i) => {
+    if (x.amount > 0) {
+      return `${users[i]}님이 ${x.amount}${currencyName} 획득${x.ty === 'giveBack' ? ' (반환)' : ''}`;
+    } else if (x.amount === 0) {
+      return `${users[i]}님은 ${currencyName} 변동 없음`;
+    } else if (x.amount < 0) {
+      return `${users[i]}님이 ${Math.round(-x.amount)}${currencyName} 잃음`;
+    }
+  }).join('\n');
+
+  const body = {
+    content: '예측 종료!',
+    embeds: [
+      new discord.MessageEmbed()
+        .setTitle(`[예측 종료] ${prediction.title} 결과`)
+        .setDescription(`\`${choices[choiceIndex]}\`이(가) 맞았습니다!\n${resultDesc}\n${amountDesc}`)
+        .addFields(
+          choices.map((x, i) => ({
+            name: x,
+            value: (
+              bets.filter(x => x.choiceIndex === i).length === 0
+                ? '..'
+                : bets.filter(x => x.choiceIndex === i).map(x => `<@${x.userId}> ${i === choiceIndex ? `+${x.amount}` : `${Math.round(-x.amount)}`}`).join('\n')
+            ),
+          })),
+        )
+    ],
+  } as const;
+
+  try {
+    await interaction.editReply(body as any);
+  } catch {
+    await interaction.reply(body as any);
+  }
+}
+
+async function cancelPrediction(interaction: discord.ButtonInteraction | discord.CommandInteraction, predictionId: number) {
+  const prediction = await db.prediction.findFirst({
+    where: { id: predictionId },
+  });
+
+  logger.info('betCancel.started', {
+    user: {
+      id: interaction.user.id,
+      username: interaction.user.username,
+    },
+    params: {
+      predictionId,
+    },
+  });
+
+  if (!prediction || prediction.completed) {
+    await interaction.editReply({
+      content: '버근가?',
+    });
+    return;
+  }
+
+  if (prediction.userId !== interaction.user.id && interaction.user.id !== adminId) {
+    await interaction.editReply({
+      content: '내가 만든 예측만 취소할 수 있습니다.',
+    });
+    return;
+  }
+
+  await db.prediction.update({
+    where: { id: predictionId },
+    data: {
+      completed: true,
+    }
+  });
+
+  const bets = await db.bet.findMany({
+    where: { predictionId },
+  });
+
+  const userIds = R.uniq(bets.map(x => x.userId));
+  const usersAmounts = userIds.map(userId => ({
+    userId,
+    amount: Math.round(
+      bets
+        .filter(x => x.userId === userId)
+        .reduce((acc, x) => acc + x.amount, 0)
+    ),
+  })).filter(x => x.amount !== 0);
+
+  await Promise.all(usersAmounts.map(x => charge(x.userId, x.amount)));
+
+  await interaction.editReply({
+    content: '예측이 취소되었습니다.',
+  });
 }
 
 async function upsertBet(userId: string, predictionId: number, choiceIndex: number, amount: number) {

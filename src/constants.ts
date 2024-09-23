@@ -1,0 +1,1 @@
+export const adminId = process.env.ADMIN_ID!;

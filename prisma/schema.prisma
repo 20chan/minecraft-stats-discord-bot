@@ -63,3 +63,12 @@ model ChatHistory {
   id String @id
   records String
 }
+
+model LolSummoner {
+  puuid String @id
+  accountId String
+  name String
+  summonerId String
+
+  alias String @default("")  
+}

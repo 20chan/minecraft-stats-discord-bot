@@ -25,7 +25,12 @@ import {
 import {
   handle as handleChat,
 } from './commands/chat';
+import {
+  handle as handleLol,
+} from './commands/lol';
 import { logger } from './logger';
+import { adminId } from './constants';
+import { batch } from './lol';
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const CLIENT_ID = process.env.CLIENT_ID!;
@@ -48,7 +53,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName('명언')
     .setDescription('명언 제조기')
-    .addStringOption(option => option.setName('url').setDescription('메시지 url')),
+    .addStringOption(option => option.setName('url').setDescription('메시지 url').setRequired(true)),
   new SlashCommandBuilder()
     .setName('베팅')
     .setDescription('예측 베팅')
@@ -57,6 +62,22 @@ const commands = [
       .setDescription('새로운 예측을 시작합니다')
       .addStringOption(option => option.setName('주제').setDescription('예측 주제').setRequired(true))
       .addStringOption(option => option.setName('선택지').setDescription('선택지를 쉼표로 구분해서 입력하세요').setRequired(true))
+  )
+    .addSubcommand(subcommand => subcommand
+      .setName('종료')
+      .setDescription('베팅 종료')
+      .addIntegerOption(option => option.setName('id').setDescription('베팅 id').setRequired(true))
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('결과')
+      .setDescription('베팅 결과')
+      .addIntegerOption(option => option.setName('id').setDescription('베팅 id').setRequired(true))
+      .addIntegerOption(option => option.setName('index').setDescription('결과 인덱스').setRequired(true))
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('취소')
+      .setDescription('베팅 취소')
+      .addIntegerOption(option => option.setName('id').setDescription('베팅 id').setRequired(true))
     ),
   new SlashCommandBuilder()
     .setName('코인')
@@ -85,7 +106,7 @@ const commands = [
     )
     .addSubcommand(subcommand => subcommand
       .setName('스틸')
-      .setDescription('상대에게 1000원을 주고, 내 전재산 중 1000원만큼의 비율을 상대방 전재산 비율로 도박을 해서 돈을 뺏어온다, 하루 3번 제한')
+      .setDescription('상대에게 1000원을 주고, 내 전재산 중 1000원만큼의 비율을 상대방 전재산 비율로 도박을 해서 돈을 뺏어온다, 하루 10번 제한')
       .addUserOption(option => option.setName('target').setDescription('target').setRequired(true))
     )
     .addSubcommand(subcommand => subcommand
@@ -144,7 +165,31 @@ const commands = [
     ),
   new SlashCommandBuilder()
     .setName('chat')
-    .setDescription('스레드 만들어서 챗봇과 대화하기')
+    .setDescription('스레드 만들어서 챗봇과 대화하기'),
+  new SlashCommandBuilder()
+    .setName('롤')
+    .setDescription('롤 전적 알리미')
+    .addSubcommand(subcommand => subcommand
+      .setName('등록')
+      .setDescription('롤 아이디 등록')
+      .addStringOption(option => option.setName('name').setDescription('롤 아이디 (태그 포함, #KR1은 생략 가능)').setRequired(true))
+      .addStringOption(option => option.setName('alias').setDescription('별칭 (메모)').setRequired(false))
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('수정')
+      .setDescription('등록된 롤 아이디 수정')
+      .addStringOption(option => option.setName('name').setDescription('롤 아이디 (태그 포함, #KR1은 생략 가능)').setRequired(true))
+      .addStringOption(option => option.setName('alias').setDescription('별칭 (메모)').setRequired(false))
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('삭제')
+      .setDescription('등록된 롤 아이디 삭제')
+      .addStringOption(option => option.setName('name').setDescription('롤 아이디 (목록에 나온것과 동일하게)').setRequired(true))
+    )
+    .addSubcommand(subcommand => subcommand
+      .setName('목록')
+      .setDescription('등록된 롤 아이디 목록')
+    )
 ].map(x => x.toJSON());
 
 async function main() {
@@ -175,6 +220,8 @@ async function main() {
         await handleTTS(client, interaction);
       } else if (interaction.commandName === 'chat') {
         await handleChat(client, interaction);
+      } else if (interaction.commandName === '롤') {
+        await handleLol(client, interaction);
       }
     } catch (error) {
       logger.error('interaction error', error);
@@ -216,6 +263,10 @@ cron.schedule('0 0 * * *', async () => {
   const users = await getUserList();
   const current = users.map(postProcess);
   await saveSnapshot(current);
+});
+
+cron.schedule('*/30 * * * * *', async () => {
+  await batch();
 });
 
 main()
