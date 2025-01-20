@@ -123,7 +123,7 @@ export async function processMatch(account: Account, matchId: string) {
 
   ctx.fillStyle = ctx.strokeStyle = 'white';
   ctx.font = 'bold 40px NanumBarunGothic';
-  ctx.fillText(participant.summonerName, 130, 50, 420);
+  ctx.fillText(participant.riotIdGameName, 130, 50, 420);
 
   ctx.fillStyle = ctx.strokeStyle = participant.win ? '#5383E8' : '#E84057';
   ctx.font = 'bold 30px NanumBarunGothic';
@@ -145,7 +145,7 @@ export async function processMatch(account: Account, matchId: string) {
     imageUrl: `https://cdn.0ch.me/lol/${encodeURIComponent(account.name)}/${matchId}.png`,
     metadata: {
       color: participant.win ? 0x5383E8 : 0xE84057,
-      summonerName: participant.summonerName,
+      summonerName: participant.riotIdGameName,
       level: participant.summonerLevel,
       doubleKills: participant.doubleKills,
       tripleKills: participant.tripleKills,

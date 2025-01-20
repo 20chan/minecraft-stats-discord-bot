@@ -265,7 +265,7 @@ cron.schedule('0 0 * * *', async () => {
   await saveSnapshot(current);
 });
 
-cron.schedule('*/30 * * * * *', async () => {
+cron.schedule('* * * * *', async () => {
   await batch();
 });
 
