@@ -105,7 +105,7 @@ export async function processMatch(account: Account, matchId: string) {
   ];
 
   const queueTypeToFind = matches.find(xs => xs[1] === kind)?.[0] ?? '';
-  const entries = await getLolEntries(account.summonerId);
+  const entries = await getLolEntries(account.puuid);
   const entry = entries.find(x => x.queueType === queueTypeToFind);
 
   const leaguePoints = entry?.leaguePoints?.toString() ?? '';

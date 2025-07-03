@@ -235,8 +235,8 @@ interface LeagueEntryDTO {
   inactive: boolean;
 }
 
-export async function getLolEntries(summonerId: string): Promise<LeagueEntryDTO[]> {
-  return await lolApi(`/lol/league/v4/entries/by-summoner/${summonerId}`);
+export async function getLolEntries(puuid: string): Promise<LeagueEntryDTO[]> {
+  return await lolApi(`/lol/league/v4/entries/by-puuid/${puuid}`);
 }
 
 export async function getLolCharacterIconUrl(championName: string): Promise<string> {
