@@ -1,14 +1,17 @@
 import { existsSync } from 'node:fs';
 import { createCanvas, loadImage, CanvasRenderingContext2D } from 'canvas';
 import { db } from './db';
-import { getLolCharacterIconUrl, getLolEntries, getLolMatches, getLolMatchInfo, getLolSummoner, getRiotAccount } from './riot';
+import { getLolCharacterIconUrl, getLolEntries, getLolMatches, getLolMatchInfo, getLolSummoner, getRiotAccount, getTftAccount, parseRiotId, tftApi } from './riot';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { logger } from './logger';
+import { PlatformId } from '@fightmegg/riot-api';
+import { getUnprocessedTftMatchId, processTftMatch } from './tft';
 
 const LOL_DISCORD_WEBHOOK_URL = process.env.LOL_DISCORD_WEBHOOK_URL!;
 
-interface Account {
+export interface Account {
   puuid: string;
+  tftPuuid: string | null;
   summonerId: string;
   accountId: string;
   name: string;
@@ -22,6 +25,7 @@ export async function getAccounts() {
 export async function addAccount(summonerName: string, alias: string): Promise<Account> {
   const { puuid } = await getRiotAccount(summonerName);
   const { id: summonerId, accountId } = await getLolSummoner(puuid);
+  const { puuid: tftPuuid } = await getTftAccount(summonerName);
 
   return await db.lolSummoner.create({
     data: {
@@ -29,6 +33,7 @@ export async function addAccount(summonerName: string, alias: string): Promise<A
       puuid,
       accountId,
       summonerId,
+      tftPuuid,
       alias,
     },
   });
@@ -47,6 +52,17 @@ export async function editAccount(summonerName: string, alias: string): Promise<
     },
     data: {
       alias,
+    },
+  });
+}
+
+export async function addTftAccount(puuid: string, tftPuuid: string): Promise<Account> {
+  return await db.lolSummoner.update({
+    where: {
+      puuid,
+    },
+    data: {
+      tftPuuid,
     },
   });
 }

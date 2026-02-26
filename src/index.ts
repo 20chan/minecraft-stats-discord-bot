@@ -31,6 +31,7 @@ import {
 import { logger } from './logger';
 import { adminId } from './constants';
 import { batch } from './lol';
+import { batchTft } from './tft';
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const CLIENT_ID = process.env.CLIENT_ID!;
@@ -265,8 +266,10 @@ cron.schedule('0 0 * * *', async () => {
   await saveSnapshot(current);
 });
 
+
 cron.schedule('* * * * *', async () => {
   await batch();
+  await batchTft();
 });
 
 main()

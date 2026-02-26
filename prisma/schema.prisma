@@ -52,7 +52,7 @@ model Prediction {
 
 model Bet {
   id Int @id @default(autoincrement())
-  
+
   predictionId Int
   choiceIndex Int
   userId String
@@ -66,9 +66,10 @@ model ChatHistory {
 
 model LolSummoner {
   puuid String @id
+  tftPuuid String?
   accountId String
   name String
   summonerId String
 
-  alias String @default("")  
+  alias String @default("")
 }

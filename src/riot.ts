@@ -1,11 +1,23 @@
+import { RiotAPITypes } from '@fightmegg/riot-api';
 import fetch from 'node-fetch';
 
 const RIOT_API = process.env.RIOT_API_KEY!;
+const RIOT_TFT_API_KEY = process.env.RIOT_TFT_API_KEY!;
 
-async function riotApi<T>(endpoint: `/${string}`): Promise<T> {
+export async function riotApi<T>(endpoint: `/${string}`): Promise<T> {
   const response = await fetch(`https://asia.api.riotgames.com${endpoint}`, {
     headers: {
       'X-Riot-Token': RIOT_API,
+    }
+  });
+
+  return await response.json();
+}
+
+export async function tftApi<T>(endpoint: `/${string}`, region: string = 'asia'): Promise<T> {
+  const response = await fetch(`https://${region}.api.riotgames.com${endpoint}`, {
+    headers: {
+      'X-Riot-Token': RIOT_TFT_API_KEY,
     }
   });
 
@@ -28,14 +40,24 @@ interface AccountDto {
   tagLine: string;
 }
 
-export async function getRiotAccount(summonerName: string): Promise<AccountDto> {
-  const tag = summonerName.split('#');
+export function parseRiotId(summonerName: string): { gameName: string; tagLine: string } {
+  const [gameName, tagLine] = summonerName.split('#');
+  return {
+    gameName,
+    tagLine: tagLine ?? 'KR1',
+  };
+}
 
-  return (
-    tag.length === 2
-      ? await riotApi(`/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(tag[0])}/${tag[1]}`)
-      : await riotApi(`/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(summonerName)}/KR1`)
-  );
+export async function getRiotAccount(summonerName: string): Promise<AccountDto> {
+  const { gameName, tagLine } = parseRiotId(summonerName);
+
+  return await riotApi(`/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${tagLine}`);
+}
+
+export async function getTftAccount(summonerName: string): Promise<AccountDto> {
+  const { gameName, tagLine } = parseRiotId(summonerName);
+
+  return await tftApi(`/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${tagLine}`);
 }
 
 interface SummonerDTo {
@@ -239,11 +261,87 @@ export async function getLolEntries(puuid: string): Promise<LeagueEntryDTO[]> {
   return await lolApi(`/lol/league/v4/entries/by-puuid/${puuid}`);
 }
 
-export async function getLolCharacterIconUrl(championName: string): Promise<string> {
+export async function getTftEntries(puuid: string): Promise<LeagueEntryDTO[]> {
+  return await tftApi(`/tft/league/v1/by-puuid/${puuid}`, 'kr');
+}
+
+export async function getLatestVersion() {
   const resp = await fetch('https://ddragon.leagueoflegends.com/api/versions.json');
   const versions = await resp.json() as string[];
 
   const version = versions[0];
+  return version;
+}
 
+export async function getLolCharacterIconUrl(championName: string): Promise<string> {
+  const version = await getLatestVersion();
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championName}.png`;
+}
+
+export async function getTftCharacterIcons(version: string) {
+  const resp = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/tft-champion.json`);
+  const champions = await resp.json() as {
+    data: Record<string, {
+      id: string;
+      name: string;
+      tier: number;
+      cost: number;
+      image: RiotAPITypes.DDragon.DDragonImageDTO;
+    }>
+  };
+
+  return Object.values(champions.data).map(x => ({
+    ...x,
+    imageUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/tft-champion/${x.image.full}`,
+  }));
+}
+
+export async function getTftItemIcons(version: string) {
+  const resp = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/tft-item.json`);
+  const items = await resp.json() as {
+    data: Record<string, {
+      id: string;
+      name: string;
+      image: RiotAPITypes.DDragon.DDragonImageDTO;
+    }>
+  };
+
+  return Object.values(items.data).map(x => ({
+    ...x,
+    imageUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/tft-item/${x.image.full}`,
+  }));
+}
+
+export async function getTftTraitIcons(version: string) {
+  const resp = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/tft-trait.json`);
+  const traits = await resp.json() as {
+    data: Record<string, {
+      id: string;
+      name: string;
+      image: RiotAPITypes.DDragon.DDragonImageDTO;
+    }>
+  };
+
+  return Object.values(traits.data).map(x => ({
+    ...x,
+    imageUrl: `https://ddragon.leagueoflegends.com/cdn/${version}/img/tft-trait/${x.image.full}`,
+  }));
+}
+
+export async function getTftTacticianIconUrl(version: string, id: number) {
+  const resp = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/tft-tactician.json`);
+  const tacticians = await resp.json() as {
+    data: Record<string, {
+      id: string;
+      name: string;
+      image: RiotAPITypes.DDragon.DDragonImageDTO;
+    }>
+  };
+
+  const tactician = Object.values(tacticians.data).find(x => x.id === id.toString());
+  if (!tactician) {
+    return null;
+  }
+
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/tft-tactician/${tactician?.image.full}`;
 }

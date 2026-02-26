@@ -21,11 +21,11 @@ export const logger = winston.createLogger({
     printf(info => `${info.timestamp} ${info.level} ${info.message} ${inspect(info.metadata)}`),
   ),
   transports: [
-    new LokiTransport({
-      level: 'debug',
-      host: 'http://localhost:3100',
-      labels: { app: 'discord-bot-alice' },
-    }),
+    // new LokiTransport({
+    //   level: 'debug',
+    //   host: 'http://localhost:3100',
+    //   labels: { app: 'discord-bot-alice' },
+    // }),
     new winstonDaily({
       level: 'info',
       datePattern: 'YYYY-MM-DD',
