@@ -31,8 +31,8 @@ export async function addAccount(summonerName: string, alias: string): Promise<A
     data: {
       name: summonerName,
       puuid,
-      accountId,
-      summonerId,
+      accountId: accountId ?? '',
+      summonerId: summonerId ?? '',
       tftPuuid,
       alias,
     },
