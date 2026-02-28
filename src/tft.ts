@@ -84,7 +84,7 @@ export async function processTftMatch(account: Account, matchId: string) {
   const w = 45;
   const h = 45;
   const gap = 2;
-  const tierColors = ['#848999', '#11b288', '#207ac7', '#c440da', '#ffb93b', '#fffbc2'];
+  const tierColors = ['#848999', '#848999', '#11b288', '#207ac7', '#c440da', '#ffb93b', '#fffbc2'];
 
   const units = participant.units.map(x => ({
     ...x,
