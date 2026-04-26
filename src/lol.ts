@@ -127,11 +127,11 @@ export async function processMatch(account: Account, matchId: string) {
   const leaguePoints = entry?.leaguePoints?.toString() ?? '';
   const tierSummary = entry ? `${entry.tier} ${entry.rank}, ${leaguePoints}p` : '';
 
-  const canvas = createCanvas(550, 120);
+  const canvas = createCanvas(550, 205);
   const ctx = canvas.getContext('2d');
 
   ctx.fillStyle = ctx.strokeStyle = participant.win ? '#28344E' : '#59343B';
-  ctx.fillRect(0, 0, 550, 120);
+  ctx.fillRect(0, 0, 550, 205);
 
   const characterIconUrl = await getLolCharacterIconUrl(participant.championName);
   const characterIcon = await loadImage(characterIconUrl);
@@ -148,6 +148,34 @@ export async function processMatch(account: Account, matchId: string) {
   ctx.fillStyle = ctx.strokeStyle = '#9E9EB1';
   ctx.font = 'bold 15px NanumBarunGothic';
   ctx.fillText(`${participant.lane}    ||    KDA  ${participant.kills} / ${participant.deaths} / ${participant.assists}     ||     ${duration}`, 130, 108, 420);
+
+
+  ctx.fillStyle = ctx.strokeStyle = '#9E9EB1';
+  ctx.fillRect(0, 120, 550, 1);
+
+  const teamParticipants = match.info.participants.filter(x => x.teamId === participant.teamId);
+
+  const teamParticipantsSorted = [
+    teamParticipants.find(x => x.teamPosition === 'TOP'),
+    teamParticipants.find(x => x.teamPosition === 'JUNGLE'),
+    teamParticipants.find(x => x.teamPosition === 'MIDDLE'),
+    teamParticipants.find(x => x.teamPosition === 'BOTTOM'),
+    teamParticipants.find(x => x.teamPosition === 'UTILITY'),
+  ];
+
+  const maxDamage = Math.max(...teamParticipants.map(x => x.totalDamageDealtToChampions));
+  for (const p of teamParticipantsSorted) {
+    ctx.fillStyle = ctx.strokeStyle = p?.puuid === participant.puuid ? '#5383E8' : '#9E9EB1';
+    ctx.fillRect(125, 128, (p?.totalDamageDealtToChampions ?? 0) / (maxDamage / 400), 10);
+    ctx.fillStyle = ctx.strokeStyle = '#9E9EB1';
+    ctx.font = 'bold 10px NanumBarunGothic';
+    ctx.fillText(p?.riotIdGameName ?? '', 5, 136, 420);
+
+    ctx.fillStyle = '#28344E';
+    ctx.font = 'bold 10px NanumBarunGothic';
+    ctx.fillText(`${p?.totalDamageDealtToChampions}`, 127, 136, 420);
+    ctx.translate(0, 15);
+  }
 
   if (!existsSync(`./data/exports/${account.name}`)) {
     await mkdir(`./data/exports/${account.name}`);
