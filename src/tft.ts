@@ -30,6 +30,8 @@ export async function processTftMatch(account: Account, matchId: string) {
     [1130, '초고속'],
     [1160, '깐부'],
     [1210, '배불뚝'],
+    [6000, '부활'],
+    [6100, '부활'],
   ] as const;
 
   const queue = queues.find(x => x[0] === match.info.queue_id)?.[1];
